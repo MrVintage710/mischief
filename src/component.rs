@@ -1,6 +1,7 @@
 use std::{collections::{HashSet, VecDeque}, io::BufReader};
 
 use bevy::{asset::{AssetLoader, AsyncReadExt}, prelude::*};
+use ratatui::widgets::Borders;
 use xml::{EventReader, ParserConfig, attribute::OwnedAttribute, reader::XmlEvent};
 
 use crate::{layout::{Layout, Padding}, node::{Node, block::Block}, style::Style};
@@ -33,12 +34,10 @@ pub fn asset_loaded_or_changed(
     component_defs : Res<Assets<TerminalComponentDefinition>>
 ) {
     let ids = asset_events.read().filter_map(|e| match e {
-        AssetEvent::Modified { id } => Some(*id),
+        AssetEvent::Modified { id } => {println!("Modified"); Some(*id)},
         AssetEvent::LoadedWithDependencies { id } => Some(*id),
         _ => None
     }).collect::<HashSet<_>>();
-    
-    // if !ids.is_empty() { println!("Assets being updated: {:?}", ids) }
     
     for id in ids.iter().into_iter() {
         let Some(component_def) = component_defs.get(*id) else { continue };
@@ -47,7 +46,6 @@ pub fn asset_loaded_or_changed(
         
         let mut parent_stack = VecDeque::default();
         parent_stack.push_front(component);
-        
         
         for event in component_def.events.iter() {
             match event {
@@ -69,7 +67,7 @@ pub fn asset_loaded_or_changed(
 //        Util Functions
 //==============================================================================================
 
-pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -> Option<(Layout, Padding, Style)> {
+pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -> Option<(Layout, Padding, Style, crate::layout::Rect)> {
     let style_attr = attributes.iter().find(|attr| &attr.name.local_name == "style")?;
     
     let tokens = tailwind_ast::parse_tailwind(&style_attr.value)
@@ -79,12 +77,20 @@ pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -
     let mut layout = Layout::default();
     let mut padding = Padding::default();
     let mut style = Style::default();
+    let mut rect = crate::layout::Rect::default();
+    let mut border = ratatui::widgets::Block::new();
     
     for token in tokens.iter() {
-        //Do the things
+        if token.elements.starts_with(&["border"]) {
+            // let Some()
+            border.
+            if token.elements[1] == "" {
+                
+            }
+        }
     }
     
-    Some((layout, padding, style))
+    Some((layout, padding, style, rect))
 }
 
 //==============================================================================================
@@ -135,7 +141,6 @@ impl AssetLoader for TerminalComponentLoader {
         );
         let mut events = Vec::new();
         for event in xml_reader.into_iter() {
-            
             events.push(event?)
         }
         

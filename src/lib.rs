@@ -7,8 +7,8 @@ pub mod component;
 
 use std::{collections::HashSet, io::Stdout, ops::{Deref, DerefMut}, time::Duration};
 
-use bevy::{app::ScheduleRunnerPlugin, ecs::query::QueryData, prelude::*};
-use ratatui::{TerminalOptions, Viewport, crossterm::{self, event::{Event, KeyCode, KeyEventKind}}, prelude::CrosstermBackend};
+use bevy::{app::ScheduleRunnerPlugin, ecs::{query::QueryData, resource}, prelude::*};
+use ratatui::{TerminalOptions, crossterm::{self, ExecutableCommand, event::{Event, KeyCode}, terminal::{EnterAlternateScreen, LeaveAlternateScreen}}, prelude::CrosstermBackend};
 
 use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin}, node::{Node, NodePlugin, NullComponent}, style::Style};
 
@@ -16,27 +16,28 @@ use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{G
 //        TerminalAppPlugin
 //==============================================================================================
 
-pub struct TerminalAppPlugin {
-    viewport : Viewport,
+pub struct MischiefPlugin {
+    viewport : ratatui::Viewport,
 }
 
-impl TerminalAppPlugin {
+impl MischiefPlugin {
     pub fn new() -> Self {
-        Self { viewport : Viewport::Fullscreen }
+        Self { viewport : ratatui::Viewport::Fullscreen }
     }
     
     pub fn inline(mut self, height : u16) -> Self {
-        self.viewport = Viewport::Inline(height);
+        self.viewport = ratatui::Viewport::Inline(height);
         self
     }
 }
 
-impl Plugin for TerminalAppPlugin{
+impl Plugin for MischiefPlugin{
     fn build(&self, app: &mut App) {
         let mut terminal = Terminal(ratatui::init_with_options(TerminalOptions { viewport : self.viewport.clone() }));
+        let viewport = Viewport(self.viewport.clone());
         
-        if matches!(self.viewport, Viewport::Fullscreen) {
-            terminal.clear().unwrap();
+        if matches!(self.viewport, ratatui::Viewport::Fullscreen) {
+            // std::io::stdout().execute(EnterAlternateScreen).expect("Unable to enter alternate screen.");
         }
         
         terminal.hide_cursor().unwrap();
@@ -50,12 +51,13 @@ impl Plugin for TerminalAppPlugin{
             .add_plugins(TaskPoolPlugin::default())
             
             .insert_resource(terminal)
+            .insert_resource(viewport)
             
             .add_message::<TerminalMessage>()
         
             .add_systems(First, poll_app)
             .add_systems(PostUpdate, close_on_esc)
-            .add_systems(Last, flush)
+            .add_systems(Last, (flush, cleanup))
         ;
     }
 }
@@ -86,6 +88,18 @@ pub fn close_on_esc(
 ) {
     if input.pressed(KeyCode::Esc) {
         exit_message.write(AppExit::Success);
+    }
+}
+
+pub fn cleanup(
+    exit_events: MessageReader<AppExit>,
+    viewport : Res<Viewport>
+) {
+    if !exit_events.is_empty() {
+        if matches!(viewport.0, ratatui::Viewport::Fullscreen) {
+            // std::io::stdout().execute(LeaveAlternateScreen).expect("Unable to leave alternate screen.");
+        }
+        ratatui::restore();
     }
 }
 
@@ -200,3 +214,10 @@ pub fn find_roots(query : &Query<GeneralNodeQuery>) -> Vec<Entity> {
     
     roots
 }
+
+//==============================================================================================
+//        Should Restore
+//==============================================================================================
+
+#[derive(Resource)]
+pub struct Viewport(pub ratatui::Viewport);

@@ -71,7 +71,7 @@ pub fn calc_rects(
     let entities = nodes.iter().map(|node| node.entity).collect::<Vec<_>>();
     
     for e in entities {
-        let res = calc_layout(e, &mut nodes, terminal.as_ref());
+        calc_layout(e, &mut nodes, terminal.as_ref());
     }
 }
 

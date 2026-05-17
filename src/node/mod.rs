@@ -17,7 +17,7 @@ pub struct NodePlugin;
 impl Plugin for NodePlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_plugins(NodeRenderPlugin::<Block>::new())
+            // .add_plugins(NodeRenderPlugin::<Block>::new())
         ;
     }
 }
@@ -61,7 +61,6 @@ pub fn create_render_queue(
     
     let roots = find_roots(&nodes);
     
-    
     // let families = roots.iter().map(|e| {
     //     let mut members = vec![e];
     //     members.extend_from_iter(leaves.an(e));
@@ -80,7 +79,6 @@ pub fn create_render_queue(
     for root in roots.iter() {
         create_render_queue(root, &nodes, &mut render_queue);
     }
-    dbg!(&nodes.iter().len());
     render_queue
 }
 

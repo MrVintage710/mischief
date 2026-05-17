@@ -1,6 +1,6 @@
-use bevy::{ecs::{component::Component, entity::Entity, system::EntityCommands}, reflect::attributes};
+use bevy::ecs::{component::Component, entity::Entity, system::EntityCommands};
 use ratatui::{layout::Rect, prelude::Buffer, style::Style, widgets::{Borders, Widget}};
-use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace, reader::XmlEvent};
+use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
 use crate::{component::get_style_components_from_attributes, node::Node};
 
@@ -40,14 +40,15 @@ impl Node for Block {
             ..Default::default()
         };
         
-        let (layout, padding, style) = get_style_components_from_attributes(attributes).unwrap_or_default();
+        let (layout, padding, style, rect) = get_style_components_from_attributes(attributes).unwrap_or_default();
         let mut child = Entity::PLACEHOLDER;
         parent.with_children(|parent| {
             child = parent.spawn((
                 block,
                 layout,
                 padding,
-                style
+                style,
+                rect
             )).id();
         });
         Some(child)

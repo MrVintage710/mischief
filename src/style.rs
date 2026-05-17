@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ratatui::style::{Color, Modifier};
+use ratatui::{style::{Color, Modifier}, widgets::Borders};
 
 //==============================================================================================
 //        Style
@@ -33,3 +33,14 @@ impl Style {
         Self(self.0.remove_modifier(modifier))
     }
 }
+
+//==============================================================================================
+//        BorderStyle
+//==============================================================================================
+
+pub struct BorderStyle {
+    borders : Borders,
+    coloring : ratatui::style::Style,
+    border_style : ratatui::widgets::BorderType
+}
+
