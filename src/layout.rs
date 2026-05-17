@@ -115,10 +115,10 @@ impl <W : Widget> From<W> for WidgetRenderer<W> {
 #[derive(Component, Clone, Copy, Debug)]
 #[require(GlobalRect, Layout, RectState)]
 pub struct Rect {
-    x : Value,
-    y : Value,
-    width : Value,
-    height : Value
+    pub x : Value,
+    pub y : Value,
+    pub width : Value,
+    pub height : Value
 }
 
 impl Default for Rect {

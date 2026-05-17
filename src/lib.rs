@@ -69,12 +69,12 @@ impl Plugin for MischiefPlugin{
 //==============================================================================================
 
 pub fn poll_app(
-    mut terminal : ResMut<Terminal>,
-    mut message_writer : MessageWriter<TerminalMessage>
+    mut message_writer : MessageWriter<TerminalMessage>,
+    mut nodes : Query<NodeQueryMut>
 ) -> Result<(), BevyError> {
     if crossterm::event::poll(Duration::from_secs(0)).unwrap_or(false) {
         let event = crossterm::event::read()?;
-        if matches!(event, Event::Resize(_, _)) { terminal.0.clear().unwrap() }
+        if matches!(event, Event::Resize(_, _)) { nodes.iter_mut().for_each(|mut node| *node.rect_state = RectState::Dirty);}
         message_writer.write(TerminalMessage(event));
     }
     
@@ -110,6 +110,12 @@ pub fn cleanup(
         }
         ratatui::restore();
     }
+}
+
+pub fn debug(
+    nodes : Query<NodeQueryMut>
+) {
+    
 }
 
 //==============================================================================================

@@ -54,8 +54,11 @@ pub fn asset_loaded_or_changed(
             match event {
                 XmlEvent::StartElement { name, attributes, namespace } => {
                     
-                    let mut commands = commands.entity(parent_stack.front().unwrap().clone());
-                    if let Some(child) = Block::parse(&mut commands, name, attributes, namespace) {
+                    let mut entity_commands = commands.entity(parent_stack.front().unwrap().clone());
+                    if let Some(child) = Block::parse(&mut entity_commands, name, attributes, namespace) {
+                        if let Some(name) = attributes.iter().find_map(|attr| if &attr.name.local_name == "id" { Some(attr.value.clone()) } else { None }  ) {
+                            commands.entity(child).insert(Name::new(name));
+                        }
                         parent_stack.push_front(child);
                         continue;
                     }
@@ -127,4 +130,3 @@ impl AssetLoader for TerminalComponentLoader {
         &["xml"]
     }
 }
-

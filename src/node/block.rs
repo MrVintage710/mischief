@@ -34,6 +34,7 @@ impl Node for Block {
         
         if let Some(title) = &self.title { block = block.title(title.as_str()) }
         if let Some(borders) = &self.borders { block = block.borders(*borders) }
+        block = block.title_bottom(format!("{area:?}"));
         block = block.border_type(self.border_type);
         block.render(*area, buf);
     }

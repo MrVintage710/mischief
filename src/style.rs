@@ -3,7 +3,7 @@ use ratatui::{style::{Color, Modifier}, widgets::Borders};
 use tailwind_ast::AstStyle;
 use xml::attribute::OwnedAttribute;
 
-use crate::layout::{Layout, Padding};
+use crate::layout::{Layout, Padding, Value};
 
 //==============================================================================================
 //        Style
@@ -75,6 +75,7 @@ pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -
     for token in tokens.iter() {
         get_border_styles(token, &mut style_summary.border_style);
         get_padding_styles(token, &mut style_summary.padding);
+        get_react_styles(token, &mut style_summary.rect);
     }
     
     Some(style_summary)
@@ -110,5 +111,26 @@ fn get_padding_styles(token : &AstStyle, padding : &mut Padding) {
             padding.left = value;
         }
     }
+}
+
+fn get_react_styles(token : &AstStyle, rect : &mut crate::layout::Rect) {
+    if token.elements.starts_with(&["x"]) && let Some(value) = token.elements.get(1) {
+        let Ok(value) = value.parse::<u16>() else { return };
+        rect.x = Value::Px(value)
+    }
     
+    if token.elements.starts_with(&["y"]) && let Some(value) = token.elements.get(1) {
+        let Ok(value) = value.parse::<u16>() else { return };
+        rect.y = Value::Px(value)
+    }
+    
+    if token.elements.starts_with(&["w"]) && let Some(value) = token.elements.get(1) {
+        let Ok(value) = value.parse::<u16>() else { return };
+        rect.width = Value::Px(value)
+    }
+    
+    if token.elements.starts_with(&["h"]) && let Some(value) = token.elements.get(1) {
+        let Ok(value) = value.parse::<u16>() else { return };
+        rect.height = Value::Px(value)
+    }
 }
