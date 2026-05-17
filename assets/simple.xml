@@ -1,3 +1,6 @@
-<Block title="Test" style="border">
+<script>
+</script>
 
+<Block title="{ Test Title }" style="border p-1 border-double">
+    <Block title="test" style="border" />
 </Block>

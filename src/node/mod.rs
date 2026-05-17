@@ -17,7 +17,7 @@ pub struct NodePlugin;
 impl Plugin for NodePlugin {
     fn build(&self, app: &mut App) {
         app
-            // .add_plugins(NodeRenderPlugin::<Block>::new())
+            .add_plugins(NodeRenderPlugin::<Block>::new())
         ;
     }
 }
@@ -60,20 +60,6 @@ pub fn create_render_queue(
     }
     
     let roots = find_roots(&nodes);
-    
-    // let families = roots.iter().map(|e| {
-    //     let mut members = vec![e];
-    //     members.extend_from_iter(leaves.an(e));
-    //     members
-    // }).collect::<Vec<_>>();
-    
-    // for family in families {
-    //     for node in family {
-    //         let (node, global_rect, style) = nodes.get(node).unwrap();
-    //         let style = style.cloned().unwrap_or_default();
-    //         node.render(&global_rect.0, terminal.current_buffer_mut(), style.0);
-    //     }
-    // }
     
     let mut render_queue = VecDeque::new();
     for root in roots.iter() {
@@ -121,11 +107,9 @@ pub struct NodeRenderer<'w, 's> {
 }
 
 impl <'w, 's> NodeRenderer<'w, 's> {
-    
     pub fn render(&mut self, node : Entity) {
         if let Ok(block) = self.block_components.get(node) {
             block.component.render(&block.global_rect.0, self.terminal.current_buffer_mut(), block.style.cloned().unwrap_or_default().0);
         }
     }
-    
 }

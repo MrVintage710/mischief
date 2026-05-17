@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use bevy::prelude::*;
-use ratatui::{prelude::Backend, widgets::Widget};
+use ratatui::{widgets::Widget};
 
-use crate::{NodeQueryMut, Terminal};
+use crate::{NodeQueryMut, TerminalMessage};
 
 //==============================================================================================
 //        TerminalRenderPlugin
@@ -14,7 +14,12 @@ pub struct TerminalLayoutPlugin;
 impl Plugin for TerminalLayoutPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Last, calc_rects.run_if(|states : Query<&RectState>| states.iter().any(|s| s.is_dirty())))
+            .add_systems(Last,
+                (
+                    resize,
+                    calc_rects.run_if(|states : Query<&RectState>| states.iter().any(|s| s.is_dirty()))
+                ).chain()
+            )
         ;
     }
 }
@@ -25,14 +30,13 @@ impl Plugin for TerminalLayoutPlugin {
 
 pub fn calc_rects(
     mut nodes : Query<NodeQueryMut>,
-    terminal : Res<Terminal>
+    terminal_size: Res<TerminalSize>
 ) {
-    fn calc_layout(node : Entity, nodes : &mut Query<NodeQueryMut>, terminal : &Terminal) -> (GlobalRect, Layout, Padding) {
+    fn calc_layout(node : Entity, nodes : &mut Query<NodeQueryMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
         
         // Get the global bounds just in case
         let global_bounds = {
-            let bounds = terminal.backend().size().unwrap();
-            GlobalRect(ratatui::layout::Rect { x: 0, y: 0, width: bounds.width, height: bounds.height })
+            GlobalRect(ratatui::layout::Rect { x: 0, y: 0, width: terminal_size.0, height: terminal_size.1 })
         };
         
         let Some(child) = nodes.get(node).ok() else { return (global_bounds, Layout::Relative, Padding::default()) };
@@ -40,7 +44,7 @@ pub fn calc_rects(
         
         let parent = child.parent.cloned().unwrap_or(ChildOf(Entity::PLACEHOLDER));
         drop(child);
-        let (parent_bounds, parent_layout, parent_padding) = calc_layout(parent.0, nodes, terminal);
+        let (parent_bounds, parent_layout, parent_padding) = calc_layout(parent.0, nodes, terminal_size);
         
         let bounds = ratatui::layout::Rect {
             x: parent_bounds.0.x + parent_padding.left,
@@ -71,7 +75,17 @@ pub fn calc_rects(
     let entities = nodes.iter().map(|node| node.entity).collect::<Vec<_>>();
     
     for e in entities {
-        calc_layout(e, &mut nodes, terminal.as_ref());
+        calc_layout(e, &mut nodes, terminal_size.as_ref());
+    }
+}
+
+pub fn resize(
+    mut terminal_size : ResMut<TerminalSize>,
+    mut event : MessageReader<TerminalMessage>
+) {
+    for event in event.read() {
+        let ratatui::crossterm::event::Event::Resize(width, height) = event.0 else { continue };
+        *terminal_size = TerminalSize(width, height);
     }
 }
 
@@ -200,10 +214,10 @@ impl From<f32> for Value {
 
 #[derive(Default, Component, Clone, Copy, Debug)]
 pub struct Padding {
-    left : u16,
-    right : u16,
-    top : u16,
-    bottom : u16
+    pub left : u16,
+    pub right : u16,
+    pub top : u16,
+    pub bottom : u16
 }
 
 impl Padding {
@@ -240,3 +254,10 @@ impl RectState {
         matches!(self, Self::Ok)
     }
 }
+
+//==============================================================================================
+//        TerminalSize
+//==============================================================================================
+
+#[derive(Debug, Resource)]
+pub struct TerminalSize(pub u16, pub u16);

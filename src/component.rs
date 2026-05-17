@@ -1,10 +1,9 @@
 use std::{collections::{HashSet, VecDeque}, io::BufReader};
 
 use bevy::{asset::{AssetLoader, AsyncReadExt}, prelude::*};
-use ratatui::widgets::Borders;
-use xml::{EventReader, ParserConfig, attribute::OwnedAttribute, reader::XmlEvent};
+use xml::{EventReader, ParserConfig, reader::XmlEvent};
 
-use crate::{layout::{Layout, Padding}, node::{Node, block::Block}, style::Style};
+use crate::{Terminal, node::{Node, block::Block}};
 
 //==============================================================================================
 //        TerminalComponentPlugin
@@ -28,16 +27,19 @@ impl Plugin for TerminalComponentPlugin {
 //==============================================================================================
 
 pub fn asset_loaded_or_changed(
+    mut terminal : ResMut<Terminal>,
     mut commands : Commands,
     mut asset_events : MessageReader<AssetEvent<TerminalComponentDefinition>>,
     components : Query<(Entity, &TerminalComponent)>,
     component_defs : Res<Assets<TerminalComponentDefinition>>
 ) {
     let ids = asset_events.read().filter_map(|e| match e {
-        AssetEvent::Modified { id } => {println!("Modified"); Some(*id)},
+        AssetEvent::Modified { id } => Some(*id),
         AssetEvent::LoadedWithDependencies { id } => Some(*id),
         _ => None
     }).collect::<HashSet<_>>();
+    
+    if !ids.is_empty() { terminal.clear().unwrap() }
     
     for id in ids.iter().into_iter() {
         let Some(component_def) = component_defs.get(*id) else { continue };
@@ -46,51 +48,25 @@ pub fn asset_loaded_or_changed(
         
         let mut parent_stack = VecDeque::default();
         parent_stack.push_front(component);
+        let mut ignore_depth = 0;
         
         for event in component_def.events.iter() {
             match event {
                 XmlEvent::StartElement { name, attributes, namespace } => {
+                    
                     let mut commands = commands.entity(parent_stack.front().unwrap().clone());
                     if let Some(child) = Block::parse(&mut commands, name, attributes, namespace) {
                         parent_stack.push_front(child);
                         continue;
                     }
+                    
+                    ignore_depth += 1
                 },
-                XmlEvent::EndElement { name } => { parent_stack.pop_front(); },
+                XmlEvent::EndElement { .. } => { if ignore_depth == 0 { parent_stack.pop_front(); } else { ignore_depth -= 1 } },
                 _ => {}
             }
         }
     }
-}
-
-//==============================================================================================
-//        Util Functions
-//==============================================================================================
-
-pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -> Option<(Layout, Padding, Style, crate::layout::Rect)> {
-    let style_attr = attributes.iter().find(|attr| &attr.name.local_name == "style")?;
-    
-    let tokens = tailwind_ast::parse_tailwind(&style_attr.value)
-        .inspect_err(|e| eprintln!("There was an error while parsing tailwind: {e:?}"))
-        .ok()?;
-    
-    let mut layout = Layout::default();
-    let mut padding = Padding::default();
-    let mut style = Style::default();
-    let mut rect = crate::layout::Rect::default();
-    let mut border = ratatui::widgets::Block::new();
-    
-    for token in tokens.iter() {
-        if token.elements.starts_with(&["border"]) {
-            // let Some()
-            border.
-            if token.elements[1] == "" {
-                
-            }
-        }
-    }
-    
-    Some((layout, padding, style, rect))
 }
 
 //==============================================================================================

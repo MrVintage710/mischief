@@ -1,13 +1,14 @@
 use bevy::ecs::{component::Component, entity::Entity, system::EntityCommands};
-use ratatui::{layout::Rect, prelude::Buffer, style::Style, widgets::{Borders, Widget}};
+use ratatui::{layout::Rect, prelude::Buffer, style::Style, widgets::{BorderType, Borders, Widget}};
 use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
-use crate::{component::get_style_components_from_attributes, node::Node};
+use crate::{node::Node, style::get_style_components_from_attributes};
 
 #[derive(Debug, Component, Default)]
 pub struct Block {
     title : Option<String>,
-    borders : Option<Borders>
+    borders : Option<Borders>,
+    border_type : BorderType
 }
 
 impl Block {
@@ -20,6 +21,11 @@ impl Block {
         self.borders = Some(borders);
         self
     }
+    
+    pub fn border_type(mut self, border_type : BorderType) -> Self {
+        self.border_type = border_type;
+        self
+    }
 }
 
 impl Node for Block {
@@ -28,27 +34,29 @@ impl Node for Block {
         
         if let Some(title) = &self.title { block = block.title(title.as_str()) }
         if let Some(borders) = &self.borders { block = block.borders(*borders) }
+        block = block.border_type(self.border_type);
         block.render(*area, buf);
     }
 
     fn parse(parent : &mut EntityCommands, name : &OwnedName, attributes: &Vec<OwnedAttribute>, _ : &Namespace) -> Option<Entity> {
         if !(&name.local_name == "Block") { return None }
         
-        let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|value| value.value.clone());
-        let block = Block {
-            title,
-            ..Default::default()
-        };
+        let style_summary = get_style_components_from_attributes(attributes).unwrap_or_default();
         
-        let (layout, padding, style, rect) = get_style_components_from_attributes(attributes).unwrap_or_default();
+        let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|value| value.value.clone());
+        let block = Block { title, ..Default::default() }
+            .borders(style_summary.border_style.borders)
+            .border_type(style_summary.border_style.border_type)
+        ;
+        
         let mut child = Entity::PLACEHOLDER;
         parent.with_children(|parent| {
             child = parent.spawn((
                 block,
-                layout,
-                padding,
-                style,
-                rect
+                style_summary.layout,
+                style_summary.padding,
+                style_summary.style,
+                style_summary.rect
             )).id();
         });
         Some(child)

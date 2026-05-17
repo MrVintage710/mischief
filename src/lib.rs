@@ -7,10 +7,10 @@ pub mod component;
 
 use std::{collections::HashSet, io::Stdout, ops::{Deref, DerefMut}, time::Duration};
 
-use bevy::{app::ScheduleRunnerPlugin, ecs::{query::QueryData, resource}, prelude::*};
+use bevy::{app::ScheduleRunnerPlugin, ecs::{query::QueryData}, prelude::*};
 use ratatui::{TerminalOptions, crossterm::{self, ExecutableCommand, event::{Event, KeyCode}, terminal::{EnterAlternateScreen, LeaveAlternateScreen}}, prelude::CrosstermBackend};
 
-use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin}, node::{Node, NodePlugin, NullComponent}, style::Style};
+use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin, TerminalSize}, node::{Node, NodePlugin, NullComponent}, style::Style};
 
 //==============================================================================================
 //        TerminalAppPlugin
@@ -35,15 +35,16 @@ impl Plugin for MischiefPlugin{
     fn build(&self, app: &mut App) {
         let mut terminal = Terminal(ratatui::init_with_options(TerminalOptions { viewport : self.viewport.clone() }));
         let viewport = Viewport(self.viewport.clone());
+        let size = terminal.size().unwrap();
         
         if matches!(self.viewport, ratatui::Viewport::Fullscreen) {
-            // std::io::stdout().execute(EnterAlternateScreen).expect("Unable to enter alternate screen.");
+            std::io::stdout().execute(EnterAlternateScreen).expect("Unable to enter alternate screen.");
         }
         
         terminal.hide_cursor().unwrap();
         
         app
-            .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f32(1.0 / 60.0)))
+            .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f32(1.0 / 120.0)))
             .add_plugins(NodePlugin)
             .add_plugins(TerminalLayoutPlugin)
             .add_plugins(AssetPlugin::default())
@@ -52,6 +53,7 @@ impl Plugin for MischiefPlugin{
             
             .insert_resource(terminal)
             .insert_resource(viewport)
+            .insert_resource(TerminalSize(size.width, size.height))
             
             .add_message::<TerminalMessage>()
         
@@ -67,10 +69,13 @@ impl Plugin for MischiefPlugin{
 //==============================================================================================
 
 pub fn poll_app(
+    mut terminal : ResMut<Terminal>,
     mut message_writer : MessageWriter<TerminalMessage>
 ) -> Result<(), BevyError> {
     if crossterm::event::poll(Duration::from_secs(0)).unwrap_or(false) {
-        message_writer.write(TerminalMessage(crossterm::event::read()?));
+        let event = crossterm::event::read()?;
+        if matches!(event, Event::Resize(_, _)) { terminal.0.clear().unwrap() }
+        message_writer.write(TerminalMessage(event));
     }
     
     Ok(())
@@ -79,7 +84,11 @@ pub fn poll_app(
 pub fn flush(
     mut terminal : ResMut<Terminal>
 ) {
+    terminal.autoresize().unwrap();
+    
     terminal.flush().unwrap();
+    
+    terminal.swap_buffers();
 }
 
 pub fn close_on_esc(
@@ -97,7 +106,7 @@ pub fn cleanup(
 ) {
     if !exit_events.is_empty() {
         if matches!(viewport.0, ratatui::Viewport::Fullscreen) {
-            // std::io::stdout().execute(LeaveAlternateScreen).expect("Unable to leave alternate screen.");
+            std::io::stdout().execute(LeaveAlternateScreen).expect("Unable to leave alternate screen.");
         }
         ratatui::restore();
     }
