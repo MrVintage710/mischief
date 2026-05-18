@@ -59,14 +59,22 @@ pub fn calc_rects(
             Layout::Relative => {
                 child.global_rect.0 = ratatui::layout::Rect {
                     x: bounds.x + child.rect.x.get_value(bounds.width), 
-                    y: bounds.x + child.rect.y.get_value(bounds.height), 
+                    y: bounds.y + child.rect.y.get_value(bounds.height), 
                     width: child.rect.width.get_value(bounds.width), 
                     height: child.rect.height.get_value(bounds.height)
                 };
                 
                 *child.rect_state = RectState::Ok;
             },
-            Layout::Flex(flex_options) => todo!(),
+            Layout::Flex(flex_options) => {
+                let FlexOptions { gap, direction } = flex_options;
+                match direction {
+                    Direction::Vertical => {
+                        
+                    },
+                    Direction::Horizontal => todo!(),
+                }
+            },
         }
         
         (*child.global_rect, *child.layout, child.padding.as_deref().cloned().unwrap_or_default())

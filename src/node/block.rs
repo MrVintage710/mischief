@@ -7,6 +7,7 @@ use crate::{node::Node, style::get_style_components_from_attributes};
 #[derive(Debug, Component, Default)]
 pub struct Block {
     title : Option<String>,
+    title_bottom : Option<String>,
     borders : Option<Borders>,
     border_type : BorderType
 }
@@ -14,6 +15,11 @@ pub struct Block {
 impl Block {
     pub fn title(mut self, title : &str) -> Self {
         self.title = Some(title.to_string());
+        self
+    }
+    
+    pub fn title_bottom(mut self, title : &str) -> Self {
+        self.title_bottom = Some(title.to_string());
         self
     }
     
@@ -30,12 +36,16 @@ impl Block {
 
 impl Node for Block {
     fn render(&self, area: &Rect, buf: &mut Buffer, style : Style) {
-        let mut block = ratatui::widgets::Block::new().style(style);
+        let mut block = ratatui::widgets::Block::new().border_style(style).title_style(style);
         
         if let Some(title) = &self.title { block = block.title(title.as_str()) }
+        if let Some(title) = &self.title_bottom { block = block.title_bottom(title.as_str()) }
         if let Some(borders) = &self.borders { block = block.borders(*borders) }
-        block = block.title_bottom(format!("{area:?}"));
-        block = block.border_type(self.border_type);
+        block = block
+            .border_type(self.border_type)
+            .title_bottom(format!("{:?}", style.fg))
+            .title_bottom(format!("({} {} {} {})", area.x, area.y, area.width, area.height))
+        ;
         block.render(*area, buf);
     }
 
@@ -45,7 +55,8 @@ impl Node for Block {
         let style_summary = get_style_components_from_attributes(attributes).unwrap_or_default();
         
         let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|attr| attr.value.clone());
-        let block = Block { title, ..Default::default() }
+        let title_bottom = attributes.iter().find(|attr| &attr.name.local_name == "title-bottom").map(|attr| attr.value.clone());
+        let block = Block { title, title_bottom, ..Default::default() }
             .borders(style_summary.border_style.borders)
             .border_type(style_summary.border_style.border_type)
         ;

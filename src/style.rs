@@ -119,6 +119,50 @@ fn get_padding_styles(token : &AstStyle, padding : &mut Padding) {
             padding.left = value;
         }
     }
+    
+    if token.elements.starts_with(&["pt"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.top = value;
+        }
+    }
+    
+    if token.elements.starts_with(&["pb"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.bottom = value;
+        }
+    }
+    
+    if token.elements.starts_with(&["py"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.bottom = value;
+            padding.top = value;
+        }
+    }
+    
+    if token.elements.starts_with(&["pl"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.left = value;
+        }
+    }
+    
+    if token.elements.starts_with(&["pr"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.right = value;
+        }
+    }
+    
+    if token.elements.starts_with(&["px"]) {
+        if let Some(value) = token.elements.get(1) {
+            let Ok(value) = value.parse::<u16>() else { return };
+            padding.left = value;
+            padding.right = value;
+        }
+    }
 }
 
 fn get_react_styles(token : &AstStyle, rect : &mut crate::layout::Rect) {
