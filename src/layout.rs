@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use bevy::prelude::*;
 use ratatui::{widgets::Widget};
 
-use crate::{TerminalMessage, node::query::NodeQueryMut};
+use crate::{TerminalMessage, node::query::{NodeFindSiblingAbility, NodeQueryMut}};
 
 //==============================================================================================
 //        TerminalRenderPlugin
@@ -32,18 +32,18 @@ pub fn calc_rects(
     mut nodes : Query<NodeQueryMut>,
     terminal_size: Res<TerminalSize>
 ) {
-    fn calc_layout(node : Entity, nodes : &mut Query<NodeQueryMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
+    fn calc_layout(entity : Entity, nodes : &mut Query<NodeQueryMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
         
         // Get the global bounds just in case
         let global_bounds = {
             GlobalRect(ratatui::layout::Rect { x: 0, y: 0, width: terminal_size.0, height: terminal_size.1 })
         };
         
-        let Some(child) = nodes.get(node).ok() else { return (global_bounds, Layout::Relative, Padding::default()) };
-        if child.rect_state.is_ok() { return (child.global_rect.clone(), *child.layout, child.padding.cloned().unwrap_or_default()) }
+        let Some(current) = nodes.get(entity).ok() else { return (global_bounds, Layout::Relative, Padding::default()) };
         
-        let parent = child.parent.cloned().unwrap_or(ChildOf(Entity::PLACEHOLDER));
-        drop(child);
+        if current.rect_state.is_ok() { return (current.global_rect.clone(), *current.layout, current.padding.cloned().unwrap_or_default()) }
+        
+        let parent = current.parent.cloned().unwrap_or(ChildOf(Entity::PLACEHOLDER));
         let (parent_bounds, parent_layout, parent_padding) = calc_layout(parent.0, nodes, terminal_size);
         
         let bounds = ratatui::layout::Rect {
@@ -53,10 +53,13 @@ pub fn calc_rects(
             height: parent_bounds.0.height.saturating_sub(parent_padding.bottom.saturating_add(parent_padding.top)),
         };
         
-        let mut child = nodes.get_mut(node).unwrap();
+        let siblings = nodes.find_siblings(entity);
+        let sibling_index = nodes.sibling_index(entity);
+        let mut child = nodes.get_mut(entity).unwrap();
         
         match parent_layout {
             Layout::Relative => {
+                
                 child.global_rect.0 = ratatui::layout::Rect {
                     x: bounds.x + child.rect.x.get_value(bounds.width), 
                     y: bounds.y + child.rect.y.get_value(bounds.height), 

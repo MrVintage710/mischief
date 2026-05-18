@@ -1,6 +1,6 @@
 use bevy::{ecs::query::QueryData, platform::collections::{Equivalent, HashSet}, prelude::*};
 
-use crate::{layout::{GlobalRect, Layout, Padding, RectState}, style::Style};
+use crate::{layout::{GlobalRect, Layout, Padding, RectState}, node::Node, style::Style};
 
 //==============================================================================================
 //        NodeQuery
@@ -25,6 +25,14 @@ impl <'w, 's> NodeQueryItem<'w, 's> {
         let Some(name) = self.id else {return false };
         name.as_str() == id
     }
+    
+    pub fn parent(&self) -> Option<Entity> {
+        self.parent.map(|p| p.0)
+    }
+    
+    pub fn children(&self) -> Option<&Children> {
+        self.children
+    }
 }
 
 
@@ -40,6 +48,7 @@ pub struct NodeQueryMut {
     pub rect : &'static mut crate::layout::Rect,
     pub rect_state : &'static mut RectState,
     pub parent : Option<&'static ChildOf>,
+    pub children : Option<&'static Children>,
     pub layout : &'static mut Layout,
     pub padding : Option<&'static mut Padding>,
     pub style : Option<&'static mut Style>,
@@ -51,12 +60,28 @@ impl <'w, 's> NodeQueryMutReadOnlyItem<'w, 's> {
         let Some(name) = self.id else {return false };
         name.as_str() == id
     }
+    
+    pub fn parent(&self) -> Option<Entity> {
+        self.parent.map(|p| p.0)
+    }
+    
+    pub fn children(&self) -> Option<&Children> {
+        self.children
+    }
 }
 
 impl <'w, 's> NodeQueryMutItem<'w, 's> {
     pub fn has_id(&self, id : &str) -> bool {
         let Some(name) = self.id else {return false };
         name.as_str() == id
+    }
+    
+    pub fn parent(&self) -> Option<Entity> {
+        self.parent.map(|p| p.0)
+    }
+    
+    pub fn children(&self) -> Option<&Children> {
+        self.children
     }
 }
 
@@ -122,30 +147,52 @@ impl <'w, 's> NodeFindRootsAbility for Query<'w, 's, NodeQueryMut> {
     }
 }
 
+//==============================================================================================
+//        NodeFindSiblingsAbility
+//==============================================================================================
 
-pub fn find_roots(query : &Query<NodeQuery>) -> Vec<Entity> {
+pub trait NodeFindSiblingAbility : Sized {
+    fn find_siblings(&self, entity : Entity) -> Vec<Entity>;
     
-    //Define recursive function
-    fn find_roots_r(current : Entity, query : &Query<NodeQuery>, visited : &mut HashSet<Entity>, roots : &mut Vec<Entity>) {
-        if visited.contains(&current) { return }
-        let Ok(current_item) = query.get(current) else { return };
-        let Some(parent) = current_item.parent else {
-            roots.push(current);
-            return;
-        };
-        let Ok(parent) = query.get(parent.0) else {
-            roots.push(current);
-            return;
-        };
-        find_roots_r(parent.entity, query, visited, roots);
+    fn sibling_index(&self, entity : Entity) -> usize;
+}
+
+impl <'w, 's> NodeFindSiblingAbility for Query<'w, 's, NodeQuery> {
+    fn find_siblings(&self, entity : Entity) -> Vec<Entity> {
+        let Some(node) = self.get(entity).ok() else { return Vec::new() };
+        let Some(parent) = node.parent() else { return Vec::new() };
+        drop(node);
+        let Some(parent) = self.get(parent).ok() else { return Vec::new() };
+        let Some(children) = parent.children() else { return Vec::new() };
+        children.iter().filter(|c| *c != entity).collect()
+    }
+
+    fn sibling_index(&self, entity : Entity) -> usize {
+        let Some(node) = self.get(entity).ok() else { return 0 };
+        let Some(parent) = node.parent() else { return 0 };
+        drop(node);
+        let Some(parent) = self.get(parent).ok() else { return 0 };
+        let Some(children) = parent.children() else { return 0 };
+        children.iter().position(|c| c == entity).unwrap_or_default()
+    }
+}
+
+impl <'w, 's> NodeFindSiblingAbility for Query<'w, 's, NodeQueryMut> {
+    fn find_siblings(&self, entity : Entity) -> Vec<Entity> {
+        let Some(node) = self.get(entity).ok() else { return Vec::new() };
+        let Some(parent) = node.parent() else { return Vec::new() };
+        drop(node);
+        let Some(parent) = self.get(parent).ok() else { return Vec::new() };
+        let Some(children) = parent.children() else { return Vec::new() };
+        children.iter().filter(|c| *c != entity).collect()
     }
     
-    let mut roots = Vec::new();
-    let mut visited = HashSet::<Entity>::new();
-    
-    for node in query.iter() {
-        find_roots_r(node.entity, query, &mut visited, &mut roots);
+    fn sibling_index(&self, entity : Entity) -> usize {
+        let Some(node) = self.get(entity).ok() else { return 0 };
+        let Some(parent) = node.parent() else { return 0 };
+        drop(node);
+        let Some(parent) = self.get(parent).ok() else { return 0 };
+        let Some(children) = parent.children() else { return 0 };
+        children.iter().position(|c| c == entity).unwrap_or_default()
     }
-    
-    roots
 }
