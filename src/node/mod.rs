@@ -1,4 +1,5 @@
 pub mod block;
+pub mod query;
 
 use std::{collections::{HashSet, VecDeque}, marker::PhantomData};
 
@@ -6,7 +7,7 @@ use bevy::{ecs::{relationship::RelationshipSourceCollection, system::SystemParam
 use ratatui::buffer::Buffer;
 use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace, reader::XmlEvent};
 
-use crate::{GeneralNodeQuery, NodeQuery, NodeQueryMut, Terminal, find_roots, layout::{GlobalRect, calc_rects}, node::block::Block, style::Style};
+use crate::{Terminal, layout::calc_rects, node::{block::Block, query::{NodeFindRootsAbility, NodeQuery}}};
 
 //==============================================================================================
 //        NodePlugin
@@ -47,10 +48,10 @@ impl <N : Node> Plugin for NodeRenderPlugin<N> {
 //==============================================================================================
 
 pub fn create_render_queue(
-    nodes : Query<GeneralNodeQuery>,
+    nodes : Query<NodeQuery>,
 ) -> VecDeque<Entity> {
     
-    fn create_render_queue(node : Entity, nodes : &Query<GeneralNodeQuery>, render_queue : &mut VecDeque<Entity>) {
+    fn create_render_queue(node : Entity, nodes : &Query<NodeQuery>, render_queue : &mut VecDeque<Entity>) {
         let Ok(node) = nodes.get(node) else { return };
         render_queue.push_back(node.entity);
         let Some(children) = node.children else { return };
@@ -59,7 +60,7 @@ pub fn create_render_queue(
         }
     }
     
-    let roots = find_roots(&nodes);
+    let roots = nodes.find_roots();
     
     let mut render_queue = VecDeque::new();
     for root in roots.iter() {
@@ -103,13 +104,13 @@ impl Node for NullComponent {
 #[derive(SystemParam)]
 pub struct NodeRenderer<'w, 's> {
     terminal : ResMut<'w, Terminal>,
-    block_components : Query<'w, 's, NodeQuery<Block>>
+    block_components : Query<'w, 's, (&'static Block, NodeQuery)>
 }
 
 impl <'w, 's> NodeRenderer<'w, 's> {
     pub fn render(&mut self, node : Entity) {
-        if let Ok(block) = self.block_components.get(node) {
-            block.component.render(&block.global_rect.0, self.terminal.current_buffer_mut(), block.style.cloned().unwrap_or_default().0);
+        if let Ok((block, block_node)) = self.block_components.get(node) {
+            block.render(&block_node.global_rect.0, self.terminal.current_buffer_mut(), block_node.style.cloned().unwrap_or_default().0);
         }
     }
 }

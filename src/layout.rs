@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use bevy::prelude::*;
 use ratatui::{widgets::Widget};
 
-use crate::{NodeQueryMut, TerminalMessage};
+use crate::{TerminalMessage, node::query::NodeQueryMut};
 
 //==============================================================================================
 //        TerminalRenderPlugin
@@ -69,7 +69,7 @@ pub fn calc_rects(
             Layout::Flex(flex_options) => todo!(),
         }
         
-        (*child.global_rect, *child.layout, child.padding.cloned().unwrap_or_default())
+        (*child.global_rect, *child.layout, child.padding.as_deref().cloned().unwrap_or_default())
     }
     
     let entities = nodes.iter().map(|node| node.entity).collect::<Vec<_>>();

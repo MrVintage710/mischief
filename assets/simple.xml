@@ -1,6 +1,6 @@
 <import file="test.xml" as="Test"/>
 
-<Block title="{ Test Title }" style="border p-1 border-double" id="Main">
+<Block title="{ Test Title }" style="border p-1 border-double" id="main">
     <Block title="test" style="border h-10" />
     <Block title="test other " style="border h-10 y-10" />
     <Test> </Test>

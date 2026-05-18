@@ -44,7 +44,7 @@ impl Node for Block {
         
         let style_summary = get_style_components_from_attributes(attributes).unwrap_or_default();
         
-        let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|value| value.value.clone());
+        let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|attr| attr.value.clone());
         let block = Block { title, ..Default::default() }
             .borders(style_summary.border_style.borders)
             .border_type(style_summary.border_style.border_type)

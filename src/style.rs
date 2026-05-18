@@ -36,6 +36,14 @@ impl Style {
     pub fn remove_modifier(self, modifier : Modifier) -> Self { 
         Self(self.0.remove_modifier(modifier))
     }
+    
+    pub fn set_style(&mut self, style : ratatui::style::Style) {
+        self.0 = style;
+    }
+    
+    pub fn set_fg(&mut self, color : Color) {
+        self.0 = self.0.fg(color)
+    }
 }
 
 //==============================================================================================

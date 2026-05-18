@@ -10,7 +10,7 @@ use std::{collections::HashSet, io::Stdout, ops::{Deref, DerefMut}, time::Durati
 use bevy::{app::ScheduleRunnerPlugin, ecs::{query::QueryData}, prelude::*};
 use ratatui::{TerminalOptions, crossterm::{self, ExecutableCommand, event::{Event, KeyCode}, terminal::{EnterAlternateScreen, LeaveAlternateScreen}}, prelude::CrosstermBackend};
 
-use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin, TerminalSize}, node::{Node, NodePlugin, NullComponent}, style::Style};
+use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin, TerminalSize}, node::{Node, NodePlugin, NullComponent, query::NodeQueryMut}, style::Style};
 
 //==============================================================================================
 //        TerminalAppPlugin
@@ -60,6 +60,7 @@ impl Plugin for MischiefPlugin{
             .add_systems(First, poll_app)
             .add_systems(PostUpdate, close_on_esc)
             .add_systems(Last, (flush, cleanup))
+            .add_systems(Update, debug)
         ;
     }
 }
@@ -113,9 +114,12 @@ pub fn cleanup(
 }
 
 pub fn debug(
-    nodes : Query<NodeQueryMut>
+    mut nodes : Query<NodeQueryMut>
 ) {
-    
+    for node in nodes.iter_mut().filter(|node| node.has_id("main")) {
+        let Some(mut style) = node.style else {continue};
+        style.set_fg(ratatui::style::Color::Green);
+    }
 }
 
 //==============================================================================================
@@ -158,76 +162,6 @@ impl Deref for Terminal {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-//==============================================================================================
-//        NodeQuery
-//==============================================================================================
-
-#[derive(QueryData)]
-pub struct GeneralNodeQuery {
-    pub entity : Entity,
-    pub global_rect: &'static GlobalRect,
-    pub rect : &'static crate::layout::Rect,
-    pub rect_state : &'static RectState,
-    pub parent : Option<&'static ChildOf>,
-    pub children : Option<&'static Children>,
-    pub layout : &'static Layout,
-    pub padding : Option<&'static Padding>,
-    pub style : Option<&'static Style>,
-}
-
-#[derive(QueryData)]
-pub struct NodeQuery<N : Node> {
-    pub entity : Entity,
-    pub global_rect: &'static GlobalRect,
-    pub rect : &'static crate::layout::Rect,
-    pub rect_state : &'static RectState,
-    pub parent : Option<&'static ChildOf>,
-    pub children : Option<&'static Children>,
-    pub layout : &'static Layout,
-    pub padding : Option<&'static Padding>,
-    pub style : Option<&'static Style>,
-    pub component : &'static N
-}
-
-#[derive(QueryData)]
-#[query_data(mutable)]
-pub struct NodeQueryMut {
-    pub entity : Entity,
-    pub global_rect: &'static mut GlobalRect,
-    pub rect : &'static crate::layout::Rect,
-    pub rect_state : &'static mut RectState,
-    pub parent : Option<&'static ChildOf>,
-    pub layout : &'static Layout,
-    pub padding : Option<&'static Padding>
-}
-
-pub fn find_roots(query : &Query<GeneralNodeQuery>) -> Vec<Entity> {
-    
-    //Define recursive function
-    fn find_roots_r(current : Entity, query : &Query<GeneralNodeQuery>, visited : &mut HashSet<Entity>, roots : &mut Vec<Entity>) {
-        if visited.contains(&current) { return }
-        let Ok(current_item) = query.get(current) else { return };
-        let Some(parent) = current_item.parent else {
-            roots.push(current);
-            return;
-        };
-        let Ok(parent) = query.get(parent.0) else {
-            roots.push(current);
-            return;
-        };
-        find_roots_r(parent.entity, query, visited, roots);
-    }
-    
-    let mut roots = Vec::new();
-    let mut visited = HashSet::<Entity>::new();
-    
-    for node in query.iter() {
-        find_roots_r(node.entity, query, &mut visited, &mut roots);
-    }
-    
-    roots
 }
 
 //==============================================================================================
