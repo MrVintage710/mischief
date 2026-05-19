@@ -113,54 +113,54 @@ fn get_padding_styles(token : &AstStyle, padding : &mut Padding) {
     if token.elements.starts_with(&["p"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.bottom = value;
-            padding.top = value;
-            padding.right = value;
-            padding.left = value;
+            padding.bottom = value.into();
+            padding.top = value.into();
+            padding.right = value.into();
+            padding.left = value.into();
         }
     }
     
     if token.elements.starts_with(&["pt"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.top = value;
+            padding.top = value.into();
         }
     }
     
     if token.elements.starts_with(&["pb"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.bottom = value;
+            padding.bottom = value.into();
         }
     }
     
     if token.elements.starts_with(&["py"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.bottom = value;
-            padding.top = value;
+            padding.bottom = value.into();
+            padding.top = value.into();
         }
     }
     
     if token.elements.starts_with(&["pl"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.left = value;
+            padding.left = value.into();
         }
     }
     
     if token.elements.starts_with(&["pr"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.right = value;
+            padding.right = value.into();
         }
     }
     
     if token.elements.starts_with(&["px"]) {
         if let Some(value) = token.elements.get(1) {
             let Ok(value) = value.parse::<u16>() else { return };
-            padding.left = value;
-            padding.right = value;
+            padding.left = value.into();
+            padding.right = value.into();
         }
     }
 }

@@ -1,9 +1,10 @@
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
-use bevy::prelude::*;
+use bevy::{prelude::*};
 use ratatui::{widgets::Widget};
+use taffy::{LengthPercentage, LengthPercentageAuto, NodeId, Style, TaffyTree};
 
-use crate::{TerminalMessage, node::query::{NodeFindSiblingAbility, NodeQueryMut}};
+use crate::{TerminalMessage, node::query::{NodeEntityMut, NodeFindLeavesAbility, NodeFindSiblingAbility}};
 
 //==============================================================================================
 //        TerminalRenderPlugin
@@ -17,7 +18,7 @@ impl Plugin for TerminalLayoutPlugin {
             .add_systems(Last,
                 (
                     resize,
-                    calc_rects.run_if(|states : Query<&RectState>| states.iter().any(|s| s.is_dirty()))
+                    calc_rects.run_if(|states : Query<&LayoutState>| states.iter().any(|s| s.is_dirty()))
                 ).chain()
             )
         ;
@@ -29,10 +30,10 @@ impl Plugin for TerminalLayoutPlugin {
 //==============================================================================================
 
 pub fn calc_rects(
-    mut nodes : Query<NodeQueryMut>,
+    mut nodes : Query<NodeEntityMut>,
     terminal_size: Res<TerminalSize>
 ) {
-    fn calc_layout(entity : Entity, nodes : &mut Query<NodeQueryMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
+    fn calc_layout(entity : Entity, nodes : &mut Query<NodeEntityMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
         
         // Get the global bounds just in case
         let global_bounds = {
@@ -67,7 +68,7 @@ pub fn calc_rects(
                     height: child.rect.height.get_value(bounds.height)
                 };
                 
-                *child.rect_state = RectState::Ok;
+                *child.rect_state = LayoutState::Ok;
             },
             Layout::Flex(flex_options) => {
                 let FlexOptions { gap, direction } = flex_options;
@@ -88,6 +89,36 @@ pub fn calc_rects(
     for e in entities {
         calc_layout(e, &mut nodes, terminal_size.as_ref());
     }
+}
+
+pub fn calc_layout(
+    mut nodes : Query<NodeEntityMut>,
+    terminal_size: Res<TerminalSize>
+) {
+
+    pub fn fill_tree_r(current : Entity, nodes : &mut Query<NodeEntityMut>, tree : &mut TaffyTree<Entity>, lookup : &mut HashMap<Entity, NodeId>) -> Option<NodeId> {
+        if let Some(node_id) = lookup.get(&current) {return Some(*node_id)}
+        let node = nodes.get(current).ok()?;
+        
+        let padding = node.padding.cloned().unwrap_or_default().into();
+        // let inset = node.rect
+
+        let children = node.children_cloned();
+        let childrend_nodes = children.into_iter().filter_map(|child| fill_tree_r(child, nodes, tree, lookup)).collect::<Vec<_>>();
+
+        let node_id = tree.new_with_children(Style {
+            padding,
+            // inset,
+            
+            ..default()
+        }, childrend_nodes.as_slice()).ok()?;
+        lookup.insert(current, node_id);
+
+        return Some(node_id)
+    }
+    
+    let mut node_lookup = HashMap::<Entity, NodeId>::new();
+    let mut tree : TaffyTree<Entity> = TaffyTree::new();
 }
 
 pub fn resize(
@@ -124,7 +155,7 @@ impl <W : Widget> From<W> for WidgetRenderer<W> {
 //==============================================================================================
 
 #[derive(Component, Clone, Copy, Debug)]
-#[require(GlobalRect, Layout, RectState)]
+#[require(GlobalRect, Layout, LayoutState)]
 pub struct Rect {
     pub x : Value,
     pub y : Value,
@@ -142,6 +173,12 @@ impl Default for Rect {
         }
     }
 }
+
+// impl Into<taffy::Rect<LengthPercentageAuto>> for Rect {
+//     fn into(self) -> taffy::Rect<LengthPercentageAuto> {
+//         taffy::Rect { left: LengthPercentageAuto::, right: (), top: (), bottom: () }
+//     }
+// }
 
 #[derive(Component, Default, Clone, Copy, Debug)]
 pub struct GlobalRect(pub ratatui::layout::Rect);
@@ -219,21 +256,36 @@ impl From<f32> for Value {
     }
 }
 
+impl Into<LengthPercentage> for Value {
+    fn into(self) -> LengthPercentage {
+        match self {
+            Value::Px(val) => LengthPercentage::length(val as f32),
+            Value::Percent(val) => LengthPercentage::percent(val),
+        }
+    }
+}
+
 //==============================================================================================
 //        Padding
 //==============================================================================================
 
 #[derive(Default, Component, Clone, Copy, Debug)]
 pub struct Padding {
-    pub left : u16,
-    pub right : u16,
-    pub top : u16,
-    pub bottom : u16
+    pub left : Value,
+    pub right : Value,
+    pub top : Value,
+    pub bottom : Value
 }
 
 impl Padding {
-    pub fn new(left: u16, right: u16, top: u16, bottom: u16) -> Self {
-        Self { left, right, top, bottom }
+    pub fn new(left: impl Into<Value>, right: impl Into<Value>, top: impl Into<Value>, bottom: impl Into<Value>) -> Self {
+        Self { left : left.into(), right: right.into(), top: top.into(), bottom: bottom.into() }
+    }
+}
+
+impl Into<taffy::Rect<LengthPercentage>> for Padding {
+    fn into(self) -> taffy::Rect<LengthPercentage> {
+        taffy::Rect { left: self.left.into(), right: self.right.into(), top: self.top.into(), bottom: self.bottom.into() }
     }
 }
 
@@ -242,13 +294,13 @@ impl Padding {
 //==============================================================================================
 
 #[derive(Component, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RectState {
+pub enum LayoutState {
     #[default]
     Dirty,
     Ok
 }
 
-impl RectState {
+impl LayoutState {
     /// Returns `true` if the rect state is [`Dirty`].
     ///
     /// [`Dirty`]: RectState::Dirty

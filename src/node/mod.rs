@@ -1,13 +1,13 @@
 pub mod block;
 pub mod query;
 
-use std::{collections::{HashSet, VecDeque}, marker::PhantomData};
+use std::{collections::VecDeque, marker::PhantomData};
 
 use bevy::{ecs::{relationship::RelationshipSourceCollection, system::SystemParam}, prelude::*};
 use ratatui::buffer::Buffer;
-use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace, reader::XmlEvent};
+use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
-use crate::{Terminal, layout::calc_rects, node::{block::Block, query::{NodeFindRootsAbility, NodeQuery}}};
+use crate::{Terminal, layout::calc_rects, node::{block::Block, query::{NodeFindRootsAbility, NodeEntity}}};
 
 //==============================================================================================
 //        NodePlugin
@@ -48,10 +48,10 @@ impl <N : Node> Plugin for NodeRenderPlugin<N> {
 //==============================================================================================
 
 pub fn create_render_queue(
-    nodes : Query<NodeQuery>,
+    nodes : Query<NodeEntity>,
 ) -> VecDeque<Entity> {
     
-    fn create_render_queue(node : Entity, nodes : &Query<NodeQuery>, render_queue : &mut VecDeque<Entity>) {
+    fn create_render_queue(node : Entity, nodes : &Query<NodeEntity>, render_queue : &mut VecDeque<Entity>) {
         let Ok(node) = nodes.get(node) else { return };
         render_queue.push_back(node.entity);
         let Some(children) = node.children else { return };
@@ -104,7 +104,7 @@ impl Node for NullComponent {
 #[derive(SystemParam)]
 pub struct NodeRenderer<'w, 's> {
     terminal : ResMut<'w, Terminal>,
-    block_components : Query<'w, 's, (&'static Block, NodeQuery)>
+    block_components : Query<'w, 's, (&'static Block, NodeEntity)>
 }
 
 impl <'w, 's> NodeRenderer<'w, 's> {

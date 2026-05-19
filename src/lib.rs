@@ -10,7 +10,7 @@ use std::{collections::HashSet, io::Stdout, ops::{Deref, DerefMut}, time::Durati
 use bevy::{app::ScheduleRunnerPlugin, ecs::{query::QueryData}, prelude::*};
 use ratatui::{TerminalOptions, crossterm::{self, ExecutableCommand, event::{Event, KeyCode}, terminal::{EnterAlternateScreen, LeaveAlternateScreen}}, prelude::CrosstermBackend};
 
-use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, RectState, TerminalLayoutPlugin, TerminalSize}, node::{Node, NodePlugin, NullComponent, query::NodeQueryMut}, style::Style};
+use crate::{component::TerminalComponentPlugin, input::TerminalInput, layout::{GlobalRect, Layout, Padding, LayoutState, TerminalLayoutPlugin, TerminalSize}, node::{Node, NodePlugin, NullComponent, query::NodeEntityMut}, style::Style};
 
 //==============================================================================================
 //        TerminalAppPlugin
@@ -71,11 +71,11 @@ impl Plugin for MischiefPlugin{
 
 pub fn poll_app(
     mut message_writer : MessageWriter<TerminalMessage>,
-    mut nodes : Query<NodeQueryMut>
+    mut nodes : Query<NodeEntityMut>
 ) -> Result<(), BevyError> {
     if crossterm::event::poll(Duration::from_secs(0)).unwrap_or(false) {
         let event = crossterm::event::read()?;
-        if matches!(event, Event::Resize(_, _)) { nodes.iter_mut().for_each(|mut node| *node.rect_state = RectState::Dirty);}
+        if matches!(event, Event::Resize(_, _)) { nodes.iter_mut().for_each(|mut node| *node.rect_state = LayoutState::Dirty);}
         message_writer.write(TerminalMessage(event));
     }
     
@@ -114,7 +114,7 @@ pub fn cleanup(
 }
 
 pub fn debug(
-    mut nodes : Query<NodeQueryMut>
+    mut nodes : Query<NodeEntityMut>
 ) {
     for node in nodes.iter_mut().filter(|node| node.has_id("main")) {
         let Some(mut style) = node.style else {continue};
