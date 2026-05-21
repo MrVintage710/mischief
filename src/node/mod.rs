@@ -7,7 +7,7 @@ use bevy::{ecs::{relationship::RelationshipSourceCollection, system::SystemParam
 use ratatui::buffer::Buffer;
 use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
-use crate::{Terminal, layout::calc_rects, node::{block::Block, query::{NodeFindRootsAbility, NodeEntity}}};
+use crate::{Debug, Terminal, layout::calc_layout, node::{block::Block, query::{NodeEntity, NodeFindRootsAbility}}};
 
 //==============================================================================================
 //        NodePlugin
@@ -38,7 +38,8 @@ impl<N: Node> NodeRenderPlugin<N> {
 impl <N : Node> Plugin for NodeRenderPlugin<N> {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Last, create_render_queue.pipe(render).after(calc_rects))
+            .add_systems(Last, create_render_queue.pipe(render).after(calc_layout)
+                .run_if(|debug : Res<Debug>| !debug.0))
         ;
     }
 }
@@ -110,7 +111,7 @@ pub struct NodeRenderer<'w, 's> {
 impl <'w, 's> NodeRenderer<'w, 's> {
     pub fn render(&mut self, node : Entity) {
         if let Ok((block, block_node)) = self.block_components.get(node) {
-            block.render(&block_node.global_rect.0, self.terminal.current_buffer_mut(), block_node.style.cloned().unwrap_or_default().0);
+            block.render(&block_node.rect.0, self.terminal.current_buffer_mut(), block_node.style.style);
         }
     }
 }

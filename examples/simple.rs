@@ -4,7 +4,10 @@ use mischeif::{MischiefPlugin, component::TerminalComponent, node::block::Block}
 pub fn main() {
     let mut app = App::new();
 
-    app.add_plugins(MischiefPlugin::new());
+    app.add_plugins(
+        MischiefPlugin::new()
+            // .debug()
+    );
 
     app.add_systems(Startup, init);
     

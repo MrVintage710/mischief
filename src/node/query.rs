@@ -1,6 +1,6 @@
 use bevy::{ecs::query::QueryData, platform::collections::{Equivalent, HashSet}, prelude::*};
 
-use crate::{layout::{GlobalRect, Layout, LayoutState, Padding}, node::Node, style::Style};
+use crate::{layout::{Rect, LayoutState}, node::Node, style::Style};
 
 //==============================================================================================
 //        NodeEntity
@@ -9,14 +9,11 @@ use crate::{layout::{GlobalRect, Layout, LayoutState, Padding}, node::Node, styl
 #[derive(QueryData)]
 pub struct NodeEntity {
     pub entity : Entity,
-    pub global_rect: &'static GlobalRect,
-    pub rect : &'static crate::layout::Rect,
-    pub rect_state : &'static LayoutState,
+    pub rect: &'static Rect,
+    pub layout_state : &'static LayoutState,
     pub parent : Option<&'static ChildOf>,
     pub children : Option<&'static Children>,
-    pub layout : &'static Layout,
-    pub padding : Option<&'static Padding>,
-    pub style : Option<&'static Style>,
+    pub style : &'static Style,
     pub id : Option<&'static Name>
 }
 
@@ -38,6 +35,10 @@ impl <'w, 's> NodeEntityItem<'w, 's> {
         let Some(children) = self.children else { return Vec::new() };
         children.iter().map(|e| e.clone()).collect()
     }
+
+    pub fn is_layout_dirty(&self) -> bool {
+        self.layout_state.is_dirty()
+    }
 }
 
 
@@ -49,14 +50,11 @@ impl <'w, 's> NodeEntityItem<'w, 's> {
 #[query_data(mutable)]
 pub struct NodeEntityMut {
     pub entity : Entity,
-    pub global_rect: &'static mut GlobalRect,
-    pub rect : &'static mut crate::layout::Rect,
-    pub rect_state : &'static mut LayoutState,
+    pub rect: &'static mut Rect,
+    pub layout_state : &'static mut LayoutState,
     pub parent : Option<&'static ChildOf>,
     pub children : Option<&'static Children>,
-    pub layout : &'static mut Layout,
-    pub padding : Option<&'static mut Padding>,
-    pub style : Option<&'static mut Style>,
+    pub style : &'static mut Style,
     pub id : Option<&'static Name>
 }
 
@@ -78,6 +76,10 @@ impl <'w, 's> NodeEntityMutReadOnlyItem<'w, 's> {
         let Some(children) = self.children else { return Vec::new() };
         children.iter().map(|e| e.clone()).collect()
     }
+
+    pub fn is_layout_dirty(&self) -> bool {
+        self.layout_state.is_dirty()
+    }
 }
 
 impl <'w, 's> NodeEntityMutItem<'w, 's> {
@@ -97,6 +99,18 @@ impl <'w, 's> NodeEntityMutItem<'w, 's> {
     pub fn children_cloned(&self) -> Vec<Entity> {
         let Some(children) = self.children else { return Vec::new() };
         children.iter().map(|e| e.clone()).collect()
+    }
+
+    pub fn is_layout_dirty(&self) -> bool {
+        self.layout_state.is_dirty()
+    }
+
+    pub fn set_layout_dirty(&mut self) {
+        self.layout_state.set_dirty();
+    }
+
+    pub fn set_layout_ok(&mut self) {
+        self.layout_state.set_ok();
     }
 }
 
@@ -230,4 +244,72 @@ impl <'w, 's> NodeFindLeavesAbility for Query<'w, 's, NodeEntityMut> {
     fn find_leaves(&self) -> Vec<Entity> {
         self.iter().filter(|node| node.children.is_none()).map(|node| node.entity).collect()
     }
-} 
+}
+
+//==============================================================================================
+//        NodeIsDirtyAbility
+//==============================================================================================
+
+pub trait NodeCheckLayoutStateAbility : Sized {
+    fn is_layout_dirty(&self, entity : Entity) -> bool;
+
+    fn is_layout_ok(&self, entity : Entity) -> bool;
+}
+
+impl <'w, 's> NodeCheckLayoutStateAbility for Query<'w, 's, NodeEntity> {
+    fn is_layout_dirty(&self, entity : Entity) -> bool {
+        let Ok(node) = self.get(entity) else { return false };
+        node.layout_state.is_dirty()
+    }
+
+    fn is_layout_ok(&self, entity : Entity) -> bool {
+        let Ok(node) = self.get(entity) else { return false };
+        node.layout_state.is_ok()
+    }
+}
+
+impl <'w, 's> NodeCheckLayoutStateAbility for Query<'w, 's, NodeEntityMut> {
+    fn is_layout_dirty(&self, entity : Entity) -> bool {
+        let Ok(node) = self.get(entity) else { return false };
+        node.layout_state.is_dirty()
+    }
+
+    fn is_layout_ok(&self, entity : Entity) -> bool {
+        let Ok(node) = self.get(entity) else { return false };
+        node.layout_state.is_ok()
+    }
+}
+
+//==============================================================================================
+//        NodeFindFamilyAbility
+//==============================================================================================
+
+pub trait NodeFindFamilyAbility : Sized {
+    fn find_family(&self, entity : Entity) -> Vec<Entity>;
+}
+
+impl <'w, 's> NodeFindFamilyAbility for Query<'w, 's, NodeEntity> {
+    fn find_family(&self, entity : Entity) -> Vec<Entity> {
+        let Ok(node) = self.get(entity) else { return  vec![] };
+        let Some(children) = node.children else {return vec![entity] };
+        let mut result = vec![entity];
+        for child in children.iter() {
+            result.push(child);
+            result.append(&mut self.find_family(child));
+        }
+        result
+    }
+}
+
+impl <'w, 's> NodeFindFamilyAbility for Query<'w, 's, NodeEntityMut> {
+    fn find_family(&self, entity : Entity) -> Vec<Entity> {
+        let Ok(node) = self.get(entity) else { return  vec![] };
+        let Some(children) = node.children else {return vec![entity] };
+        let mut result = vec![entity];
+        for child in children.iter() {
+            result.push(child);
+            result.append(&mut self.find_family(child));
+        }
+        result
+    }
+}

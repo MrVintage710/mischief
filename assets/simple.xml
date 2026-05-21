@@ -1,5 +1,6 @@
-<Block title="{ Test Title }" style="p-1 border border-double" id="main">
+<Block style="flex flex-col border" id="main">
+    This is some text
     <Block title=" test 1 " style="border h-10" />
-    <Block title=" test 2 " style="border h-10 y-10" />
-    <Block title=" test 3 " style="border h-10 y-20" />
+    <Block title=" test 2 " style="border h-20" />
+    <Block title=" test 3 " style="border h-20" />
 </Block>

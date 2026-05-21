@@ -1,8 +1,8 @@
 use bevy::ecs::{component::Component, entity::Entity, system::EntityCommands};
-use ratatui::{layout::Rect, prelude::Buffer, style::Style, widgets::{BorderType, Borders, Widget}};
+use ratatui::{prelude::Buffer, widgets::{BorderType, Borders, Widget}};
 use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
-use crate::{node::Node, style::get_style_components_from_attributes};
+use crate::{layout::Rect, node::Node, style::Style};
 
 #[derive(Debug, Component, Default)]
 pub struct Block {
@@ -35,7 +35,7 @@ impl Block {
 }
 
 impl Node for Block {
-    fn render(&self, area: &Rect, buf: &mut Buffer, style : Style) {
+    fn render(&self, area: & ratatui::layout::Rect, buf: &mut Buffer, style : ratatui::style::Style) {
         let mut block = ratatui::widgets::Block::new().border_style(style).title_style(style);
         
         if let Some(title) = &self.title { block = block.title(title.as_str()) }
@@ -52,23 +52,21 @@ impl Node for Block {
     fn parse(parent : &mut EntityCommands, name : &OwnedName, attributes: &Vec<OwnedAttribute>, _ : &Namespace) -> Option<Entity> {
         if !(&name.local_name == "Block") { return None }
         
-        let style_summary = get_style_components_from_attributes(attributes).unwrap_or_default();
+        let styles = Style::from_attr(attributes).ok()?;
         
         let title = attributes.iter().find(|attr| &attr.name.local_name == "title").map(|attr| attr.value.clone());
         let title_bottom = attributes.iter().find(|attr| &attr.name.local_name == "title-bottom").map(|attr| attr.value.clone());
         let block = Block { title, title_bottom, ..Default::default() }
-            .borders(style_summary.border_style.borders)
-            .border_type(style_summary.border_style.border_type)
+            .borders(styles.borders)
+            .border_type(styles.border_type)
         ;
         
         let mut child = Entity::PLACEHOLDER;
         parent.with_children(|parent| {
             child = parent.spawn((
                 block,
-                style_summary.layout,
-                style_summary.padding,
-                style_summary.style,
-                style_summary.rect
+                styles,
+                Rect::default(),
             )).id();
         });
         Some(child)

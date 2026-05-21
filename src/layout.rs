@@ -1,10 +1,10 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::{HashMap, HashSet}, marker::PhantomData};
 
 use bevy::{prelude::*};
 use ratatui::{widgets::Widget};
-use taffy::{LengthPercentage, LengthPercentageAuto, NodeId, Style, TaffyTree};
+use taffy::{AvailableSpace, LengthPercentage, LengthPercentageAuto, NodeId, TaffyTree};
 
-use crate::{TerminalMessage, node::query::{NodeEntityMut, NodeFindLeavesAbility, NodeFindSiblingAbility}};
+use crate::{TerminalMessage, node::{self, query::{NodeEntityMut, NodeFindFamilyAbility, NodeFindLeavesAbility, NodeFindRootsAbility, NodeFindSiblingAbility}}};
 
 //==============================================================================================
 //        TerminalRenderPlugin
@@ -18,7 +18,7 @@ impl Plugin for TerminalLayoutPlugin {
             .add_systems(Last,
                 (
                     resize,
-                    calc_rects.run_if(|states : Query<&LayoutState>| states.iter().any(|s| s.is_dirty()))
+                    calc_layout.run_if(|states : Query<&LayoutState>| states.iter().any(|s| s.is_dirty()))
                 ).chain()
             )
         ;
@@ -29,67 +29,67 @@ impl Plugin for TerminalLayoutPlugin {
 //        Systems
 //==============================================================================================
 
-pub fn calc_rects(
-    mut nodes : Query<NodeEntityMut>,
-    terminal_size: Res<TerminalSize>
-) {
-    fn calc_layout(entity : Entity, nodes : &mut Query<NodeEntityMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
+// pub fn calc_rects(
+//     mut nodes : Query<NodeEntityMut>,
+//     terminal_size: Res<TerminalSize>
+// ) {
+//     fn calc_layout(entity : Entity, nodes : &mut Query<NodeEntityMut>, terminal_size : &TerminalSize) -> (GlobalRect, Layout, Padding) {
         
-        // Get the global bounds just in case
-        let global_bounds = {
-            GlobalRect(ratatui::layout::Rect { x: 0, y: 0, width: terminal_size.0, height: terminal_size.1 })
-        };
+//         // Get the global bounds just in case
+//         let global_bounds = {
+//             GlobalRect(ratatui::layout::Rect { x: 0, y: 0, width: terminal_size.0, height: terminal_size.1 })
+//         };
         
-        let Some(current) = nodes.get(entity).ok() else { return (global_bounds, Layout::Relative, Padding::default()) };
+//         let Some(current) = nodes.get(entity).ok() else { return (global_bounds, Layout::Relative, Padding::default()) };
         
-        if current.rect_state.is_ok() { return (current.global_rect.clone(), *current.layout, current.padding.cloned().unwrap_or_default()) }
+//         if current.rect_state.is_ok() { return (current.global_rect.clone(), *current.layout, current.padding.cloned().unwrap_or_default()) }
         
-        let parent = current.parent.cloned().unwrap_or(ChildOf(Entity::PLACEHOLDER));
-        let (parent_bounds, parent_layout, parent_padding) = calc_layout(parent.0, nodes, terminal_size);
+//         let parent = current.parent.cloned().unwrap_or(ChildOf(Entity::PLACEHOLDER));
+//         let (parent_bounds, parent_layout, parent_padding) = calc_layout(parent.0, nodes, terminal_size);
         
-        let bounds = ratatui::layout::Rect {
-            x: parent_bounds.0.x + parent_padding.left,
-            y: parent_bounds.0.y + parent_padding.top,
-            width: parent_bounds.0.width.saturating_sub(parent_padding.right.saturating_add(parent_padding.left)),
-            height: parent_bounds.0.height.saturating_sub(parent_padding.bottom.saturating_add(parent_padding.top)),
-        };
+//         let bounds = ratatui::layout::Rect {
+//             x: parent_bounds.0.x + parent_padding.left,
+//             y: parent_bounds.0.y + parent_padding.top,
+//             width: parent_bounds.0.width.saturating_sub(parent_padding.right.saturating_add(parent_padding.left)),
+//             height: parent_bounds.0.height.saturating_sub(parent_padding.bottom.saturating_add(parent_padding.top)),
+//         };
         
-        let siblings = nodes.find_siblings(entity);
-        let sibling_index = nodes.sibling_index(entity);
-        let mut child = nodes.get_mut(entity).unwrap();
+//         let siblings = nodes.find_siblings(entity);
+//         let sibling_index = nodes.sibling_index(entity);
+//         let mut child = nodes.get_mut(entity).unwrap();
         
-        match parent_layout {
-            Layout::Relative => {
+//         match parent_layout {
+//             Layout::Relative => {
                 
-                child.global_rect.0 = ratatui::layout::Rect {
-                    x: bounds.x + child.rect.x.get_value(bounds.width), 
-                    y: bounds.y + child.rect.y.get_value(bounds.height), 
-                    width: child.rect.width.get_value(bounds.width), 
-                    height: child.rect.height.get_value(bounds.height)
-                };
+//                 child.global_rect.0 = ratatui::layout::Rect {
+//                     x: bounds.x + child.rect.x.get_value(bounds.width), 
+//                     y: bounds.y + child.rect.y.get_value(bounds.height), 
+//                     width: child.rect.width.get_value(bounds.width), 
+//                     height: child.rect.height.get_value(bounds.height)
+//                 };
                 
-                *child.rect_state = LayoutState::Ok;
-            },
-            Layout::Flex(flex_options) => {
-                let FlexOptions { gap, direction } = flex_options;
-                match direction {
-                    Direction::Vertical => {
+//                 *child.layout_state = LayoutState::Ok;
+//             },
+//             Layout::Flex(flex_options) => {
+//                 let FlexOptions { gap, direction } = flex_options;
+//                 match direction {
+//                     Direction::Vertical => {
                         
-                    },
-                    Direction::Horizontal => todo!(),
-                }
-            },
-        }
+//                     },
+//                     Direction::Horizontal => todo!(),
+//                 }
+//             },
+//         }
         
-        (*child.global_rect, *child.layout, child.padding.as_deref().cloned().unwrap_or_default())
-    }
+//         (*child.global_rect, *child.layout, child.padding.as_deref().cloned().unwrap_or_default())
+//     }
     
-    let entities = nodes.iter().map(|node| node.entity).collect::<Vec<_>>();
+//     let entities = nodes.iter().map(|node| node.entity).collect::<Vec<_>>();
     
-    for e in entities {
-        calc_layout(e, &mut nodes, terminal_size.as_ref());
-    }
-}
+//     for e in entities {
+//         calc_layout(e, &mut nodes, terminal_size.as_ref());
+//     }
+// }
 
 pub fn calc_layout(
     mut nodes : Query<NodeEntityMut>,
@@ -99,19 +99,19 @@ pub fn calc_layout(
     pub fn fill_tree_r(current : Entity, nodes : &mut Query<NodeEntityMut>, tree : &mut TaffyTree<Entity>, lookup : &mut HashMap<Entity, NodeId>) -> Option<NodeId> {
         if let Some(node_id) = lookup.get(&current) {return Some(*node_id)}
         let node = nodes.get(current).ok()?;
-        
-        let padding = node.padding.cloned().unwrap_or_default().into();
-        // let inset = node.rect
+
+        //Get taffy Styleing for style
+        let style : taffy::Style = (*node.style).into();
 
         let children = node.children_cloned();
-        let childrend_nodes = children.into_iter().filter_map(|child| fill_tree_r(child, nodes, tree, lookup)).collect::<Vec<_>>();
+        let children_nodes = children.into_iter().filter_map(|child| fill_tree_r(child, nodes, tree, lookup)).collect::<Vec<_>>();
 
-        let node_id = tree.new_with_children(Style {
-            padding,
-            // inset,
-            
-            ..default()
-        }, childrend_nodes.as_slice()).ok()?;
+        let node_id = if children_nodes.is_empty() {
+            tree.new_leaf(style).ok()?
+        } else {
+            tree.new_with_children(style, children_nodes.as_slice()).ok()?
+        };
+        
         lookup.insert(current, node_id);
 
         return Some(node_id)
@@ -119,6 +119,41 @@ pub fn calc_layout(
     
     let mut node_lookup = HashMap::<Entity, NodeId>::new();
     let mut tree : TaffyTree<Entity> = TaffyTree::new();
+    tree.enable_rounding();
+
+    let node_entities = nodes.iter().map(|n| n.entity).collect::<Vec<_>>();
+    for node in node_entities.iter() {
+        fill_tree_r(*node, &mut nodes, &mut tree, &mut node_lookup);
+    }
+
+    let dirty_nodes = nodes.iter().filter(|n| n.is_layout_dirty()).map(|n| n.entity).collect::<Vec<_>>();
+    let mut nodes_needing_update = HashSet::new();
+    
+    for root in nodes.find_roots().iter() {
+        let Ok(mut node) = nodes.get_mut(*root) else { continue };
+        let Some(node_id) = node_lookup.get(&node.entity) else { continue };
+        tree.compute_layout(*node_id, taffy::Size { 
+            width: AvailableSpace::Definite(terminal_size.0 as f32), 
+            height: AvailableSpace::Definite(terminal_size.1 as f32)
+        }).unwrap();
+        node.set_layout_ok();
+        for child in nodes.find_family(*root) {
+            nodes_needing_update.insert(child);
+        }
+    }
+    
+    for node_entity in nodes_needing_update {
+        let Ok(mut node) = nodes.get_mut(node_entity) else { continue };
+        let Some(node_id) = node_lookup.get(&node.entity) else { continue };
+        let Ok(layout) = tree.layout(*node_id) else { continue };
+        let rect = ratatui::layout::Rect { 
+            x: layout.location.x as u16, 
+            y: layout.location.y as u16, 
+            width: layout.size.width as u16, 
+            height: layout.size.height as u16 
+        };
+        node.rect.0 = rect;
+    }
 }
 
 pub fn resize(
@@ -151,143 +186,12 @@ impl <W : Widget> From<W> for WidgetRenderer<W> {
 }
 
 //==============================================================================================
-//        Rects
+//        Rect
 //==============================================================================================
-
-#[derive(Component, Clone, Copy, Debug)]
-#[require(GlobalRect, Layout, LayoutState)]
-pub struct Rect {
-    pub x : Value,
-    pub y : Value,
-    pub width : Value,
-    pub height : Value
-}
-
-impl Default for Rect {
-    fn default() -> Self {
-        Self { 
-            x: Value::Px(0), 
-            y: Value::Px(0), 
-            width: Value::Percent(1.0), 
-            height: Value::Percent(1.0) 
-        }
-    }
-}
-
-// impl Into<taffy::Rect<LengthPercentageAuto>> for Rect {
-//     fn into(self) -> taffy::Rect<LengthPercentageAuto> {
-//         taffy::Rect { left: LengthPercentageAuto::, right: (), top: (), bottom: () }
-//     }
-// }
 
 #[derive(Component, Default, Clone, Copy, Debug)]
-pub struct GlobalRect(pub ratatui::layout::Rect);
-
-//==============================================================================================
-//        Layout
-//==============================================================================================
-
-#[derive(Component, Clone, Copy, Debug)]
-pub enum Layout {
-    Relative,
-    Flex(FlexOptions),
-}
-
-impl Default for Layout {
-    fn default() -> Self {
-        Layout::Relative
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FlexOptions {
-    gap : Value,
-    direction : Direction,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Direction {
-    Vertical,
-    Horizontal
-}
-
-//==============================================================================================
-//        Value
-//==============================================================================================
-
-#[derive(Debug, Clone, Copy)]
-pub enum Value {
-    Px(u16),
-    Percent(f32),
-}
-
-impl Value {
-    
-    pub fn get_value(&self, parent_dimention : u16) -> u16 {
-        match self {
-            Value::Px(value) => *value,
-            Value::Percent(percent) => (parent_dimention as f32 * (*percent)).floor() as u16,
-        }
-    }
-    
-    pub fn custom_calc(&self, callback : impl FnOnce(f32) -> u16 ) -> u16 {
-        match self {
-            Value::Px(value) => *value,
-            Value::Percent(percent) => callback(*percent),
-        }
-    }
-}
-
-impl Default for Value {
-    fn default() -> Self {
-        Self::Px(0)
-    }
-}
-
-impl From<u16> for Value {
-    fn from(value: u16) -> Self {
-        Value::Px(value)
-    }
-}
-
-impl From<f32> for Value {
-    fn from(value: f32) -> Self {
-        Value::Percent(value)
-    }
-}
-
-impl Into<LengthPercentage> for Value {
-    fn into(self) -> LengthPercentage {
-        match self {
-            Value::Px(val) => LengthPercentage::length(val as f32),
-            Value::Percent(val) => LengthPercentage::percent(val),
-        }
-    }
-}
-
-//==============================================================================================
-//        Padding
-//==============================================================================================
-
-#[derive(Default, Component, Clone, Copy, Debug)]
-pub struct Padding {
-    pub left : Value,
-    pub right : Value,
-    pub top : Value,
-    pub bottom : Value
-}
-
-impl Padding {
-    pub fn new(left: impl Into<Value>, right: impl Into<Value>, top: impl Into<Value>, bottom: impl Into<Value>) -> Self {
-        Self { left : left.into(), right: right.into(), top: top.into(), bottom: bottom.into() }
-    }
-}
-
-impl Into<taffy::Rect<LengthPercentage>> for Padding {
-    fn into(self) -> taffy::Rect<LengthPercentage> {
-        taffy::Rect { left: self.left.into(), right: self.right.into(), top: self.top.into(), bottom: self.bottom.into() }
-    }
-}
+#[require(LayoutState)]
+pub struct Rect(pub ratatui::layout::Rect);
 
 //==============================================================================================
 //        NodeState
@@ -315,6 +219,14 @@ impl LayoutState {
     #[must_use]
     pub fn is_ok(&self) -> bool {
         matches!(self, Self::Ok)
+    }
+
+    pub fn set_dirty(&mut self) {
+        std::mem::replace(self, LayoutState::Dirty);
+    }
+
+    pub fn set_ok(&mut self) {
+        std::mem::replace(self, LayoutState::Ok);
     }
 }
 
