@@ -71,5 +71,4 @@ impl Node for Block {
         });
         Some(child)
     }
-    
 }

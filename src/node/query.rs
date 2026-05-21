@@ -1,6 +1,6 @@
-use bevy::{ecs::query::QueryData, platform::collections::{Equivalent, HashSet}, prelude::*};
+use bevy::{ecs::query::QueryData, platform::collections::{HashSet}, prelude::*};
 
-use crate::{layout::{Rect, LayoutState}, node::Node, style::Style};
+use crate::{layout::{Rect, LayoutState}, style::Style};
 
 //==============================================================================================
 //        NodeEntity
@@ -11,15 +11,15 @@ pub struct NodeEntity {
     pub entity : Entity,
     pub rect: &'static Rect,
     pub layout_state : &'static LayoutState,
+    pub style : &'static Style,
     pub parent : Option<&'static ChildOf>,
     pub children : Option<&'static Children>,
-    pub style : &'static Style,
     pub id : Option<&'static Name>
 }
 
 impl <'w, 's> NodeEntityItem<'w, 's> {
     pub fn has_id(&self, id : &str) -> bool {
-        let Some(name) = self.id else {return false };
+        let Some(name) = self.id else { return false };
         name.as_str() == id
     }
     

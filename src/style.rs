@@ -26,7 +26,9 @@ pub struct Style{
     pub justify_content : Option<taffy::JustifyContent>,
     pub align_content : Option<taffy::AlignContent>,
     pub borders : Borders,
-    pub border_type : BorderType
+    pub border_type : BorderType,
+    pub border_size : StyleRect,
+    pub has_title : bool,
 }
 
 impl Style {
@@ -99,8 +101,18 @@ impl Style {
             *borders = Borders::all();
         }
 
-        if token.elements.eq(&["border"]) {
-            *borders = Borders::all();
+        if token.elements.starts_with(&["border"]) {
+            let Some(dir) = token.elements.get(1) else { return };
+            match *dir {
+                "t" => *borders |= Borders::TOP,
+                "b" => *borders |= Borders::BOTTOM,
+                "l" => *borders |= Borders::LEFT,
+                "r" => *borders |= Borders::RIGHT,
+                "x" => *borders |= Borders::LEFT | Borders::RIGHT,
+                "y" => *borders |= Borders::TOP | Borders::BOTTOM,
+                _ => {}
+            }
+            
         }
     }
 
@@ -173,16 +185,22 @@ impl Default for Style {
             justify_content: Default::default(), 
             align_content: Default::default(),
             borders: Borders::empty(),
-            border_type: BorderType::Plain
+            border_type: BorderType::Plain,
+            border_size: StyleRect::ZERO,
+            has_title : false
         }
     }
 }
 
 impl Into<taffy::Style> for Style {
-    fn into(self) -> taffy::Style {
-        let border = if self.borders.is_empty() {taffy::Rect::zero()} else {taffy::Rect::length(1.0)};
+    fn into(mut self) -> taffy::Style {
+        if self.has_title { self.border_size.top.set_px_if_over(1);}
+        if self.borders.contains(Borders::TOP) { self.border_size.top.set_px_if_over(1);}
+        if self.borders.contains(Borders::BOTTOM) { self.border_size.bottom.set_px_if_over(1);}
+        if self.borders.contains(Borders::LEFT) { self.border_size.left.set_px_if_over(1);}
+        if self.borders.contains(Borders::RIGHT) { self.border_size.right.set_px_if_over(1);}
         taffy::Style {
-            border,
+            border : self.border_size.into(),
             size : self.size.into(),
             min_size : self.min_size.into(),
             max_size : self.max_size.into(),
@@ -249,6 +267,11 @@ pub enum Unit {
 
 impl Unit {
     pub const FULL : Self = Self::Percent(1.0);
+
+    pub fn set_px_if_over(&mut self, value : u16) {
+        let Self::Px(inner) = self else { return };
+        if *inner < value { *inner = value};
+    }
 }
 
 impl TaffyZero for Unit {

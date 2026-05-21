@@ -3,7 +3,7 @@ use std::{collections::{HashSet, VecDeque}, io::BufReader};
 use bevy::{asset::{AssetLoader, AsyncReadExt}, prelude::*};
 use xml::{EventReader, ParserConfig, reader::XmlEvent};
 
-use crate::{Terminal, node::{Node, block::Block}};
+use crate::{node::{Node, block::Block}};
 
 //==============================================================================================
 //        TerminalComponentPlugin
@@ -27,7 +27,6 @@ impl Plugin for TerminalComponentPlugin {
 //==============================================================================================
 
 pub fn asset_loaded_or_changed(
-    mut terminal : ResMut<Terminal>,
     mut commands : Commands,
     mut asset_events : MessageReader<AssetEvent<TerminalComponentDefinition>>,
     components : Query<(Entity, &TerminalComponent)>,
@@ -38,8 +37,6 @@ pub fn asset_loaded_or_changed(
         AssetEvent::LoadedWithDependencies { id } => Some(*id),
         _ => None
     }).collect::<HashSet<_>>();
-    
-    if !ids.is_empty() { terminal.clear().unwrap() }
     
     for id in ids.iter().into_iter() {
         let Some(component_def) = component_defs.get(*id) else { continue };
