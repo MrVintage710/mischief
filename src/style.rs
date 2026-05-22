@@ -1,7 +1,7 @@
-use std::str::FromStr;
+use std::{str::FromStr};
 
 use bevy::prelude::*;
-use ratatui::widgets::{BorderType, Borders};
+use ratatui::{style::Color, symbols::border, widgets::{Block, BorderType, Borders}};
 use regex::Regex;
 use taffy::{Dimension, LengthPercentage, LengthPercentageAuto, style_helpers::{FromLength, FromPercent, TaffyAuto, TaffyZero}};
 use tailwind_ast::AstStyle;
@@ -28,146 +28,49 @@ pub struct Style{
     pub borders : Borders,
     pub border_type : BorderType,
     pub border_size : StyleRect,
-    pub has_title : bool,
+    pub bg_color : Color,
+    pub fg_color : Color,
+    pub border_bg_color : Color,
+    pub border_fg_color : Color
 }
 
 impl Style {
-    
     pub fn from_attr(attributes: &Vec<OwnedAttribute>) -> MischiefResult<Self> {
         let mut styles = Style::default();
 
-        let Some(style_attr) = attributes.iter().find(|attr| &attr.name.local_name == "style") else { return Err(MischiefError::NoValue)};
-        
-        let Ok(tokens) = tailwind_ast::parse_tailwind(&style_attr.value) else { return Err(MischiefError::TailwindParsingError(style_attr.value.to_string()))};
-
-        for token in tokens.iter() {
-            Self::set_flex_styles(&mut styles, token);
-            //Width and Height Setters
-            Self::set_dimention::<'w'>(&mut styles.size.width, &mut styles.min_size.width, &mut styles.max_size.width, token);
-            Self::set_dimention::<'h'>(&mut styles.size.height, &mut styles.min_size.height, &mut styles.max_size.height, token);
-            //Padding
-            Self::set_style_rect("p", &mut styles.padding, token);
-            //Borders
-            Self::set_borders(&mut styles.borders, &mut styles.border_type, token);
-        }
+        if let Some(style_attr) = attributes.iter().find(|attr| &attr.name.local_name == "style") {
+            let Ok(tokens) = tailwind_ast::parse_tailwind(&style_attr.value) else { return Err(MischiefError::TailwindParsingError(style_attr.value.to_string()))};
+    
+            for token in tokens.iter() {
+                set_flex_styles(&mut styles, token);
+                //Width and Height Setters
+                set_dimention::<'w'>(&mut styles.size.width, &mut styles.min_size.width, &mut styles.max_size.width, token);
+                set_dimention::<'h'>(&mut styles.size.height, &mut styles.min_size.height, &mut styles.max_size.height, token);
+                //Padding
+                set_style_rect("p", &mut styles.padding, token);
+                //Borders
+                set_borders(&mut styles.borders, &mut styles.border_type, &mut styles.border_bg_color, &mut styles.border_fg_color, token);
+            }
+        };
         
         Ok(styles)
     }
 
-    fn set_flex_styles(styles : &mut Style, token : &AstStyle) {
-        if !token.elements.starts_with(&["flex"]) { return }
-        
-        if token.elements.eq(&["flex"]) {
-            styles.display = taffy::Display::Flex
-        }
-        
-        if token.elements.eq(&["flex", "col"]) {
-            styles.flex_direction = taffy::FlexDirection::Column
-        }
-
-        if token.elements.eq(&["flex", "col", "reverse"]) {
-            styles.flex_direction = taffy::FlexDirection::ColumnReverse
-        }
-
-        if token.elements.eq(&["flex", "row"]) {
-            styles.flex_direction = taffy::FlexDirection::Row
-        }
-
-        if token.elements.eq(&["flex", "row", "reverse"]) {
-            styles.flex_direction = taffy::FlexDirection::RowReverse
-        }
+    pub fn create_block<'a>(&'a self) -> Block<'a> {
+        Block::new()
+            .borders(self.borders)
+            .border_type(self.border_type)
+            .border_style(ratatui::prelude::Style::new()
+                .bg(self.border_bg_color)
+                .fg(self.border_fg_color)
+            )
     }
 
-    fn set_dimention<const DIM : char>(value : &mut Unit, min : &mut Unit, max : &mut Unit, token : &AstStyle) {
-        let mut buffer = [0; 4]; // A char can be up to 4 bytes
-        let s: &str = DIM.encode_utf8(&mut buffer);
-        if !token.elements.starts_with(&[s]) { return }
-
-        if let Some(next) = token.elements.get(1) {
-            let value = match *next {
-                "max" => max,
-                "min" => min,
-                _ => value
-            };
-
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            *value = unit;
+    pub fn minimum_space() -> Self {
+        return Style {
+            size : StyleSize::AUTO,
+            ..Default::default()
         }
-    }
-
-    fn set_borders(borders : &mut Borders, border_type : &mut BorderType, token : &AstStyle) {
-
-        if token.elements.eq(&["border"]) {
-            *borders = Borders::all();
-        }
-
-        if token.elements.starts_with(&["border"]) {
-            let Some(dir) = token.elements.get(1) else { return };
-            match *dir {
-                "t" => *borders |= Borders::TOP,
-                "b" => *borders |= Borders::BOTTOM,
-                "l" => *borders |= Borders::LEFT,
-                "r" => *borders |= Borders::RIGHT,
-                "x" => *borders |= Borders::LEFT | Borders::RIGHT,
-                "y" => *borders |= Borders::TOP | Borders::BOTTOM,
-                _ => {}
-            }
-            
-        }
-    }
-
-    fn set_style_rect(prefix : &str, value : &mut StyleRect, token : &AstStyle) {
-        if token.elements.starts_with(&[&format!("{prefix}l")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.left = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}r")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.right = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}t")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.top = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}b")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.bottom = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}x")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.left = unit;
-            value.right = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}y")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.top = unit;
-            value.bottom = unit;
-        }
-
-        if token.elements.starts_with(&[&format!("{prefix}")]) {
-            let Ok(unit) = Self::parse_end_number_or_arbitrary(token) else { return };
-            value.top = unit;
-            value.bottom = unit;
-            value.left = unit;
-            value.right = unit;
-        }
-    }
-
-    fn parse_end_number_or_arbitrary(token : &AstStyle) -> MischiefResult<Unit> {
-        if let Some(last) = token.elements.last() && let Ok(unit) = last.parse() {
-            return Ok(unit)
-        }
-        
-        if let Some(arbitrary) = token.arbitrary && let Ok(unit) = arbitrary.parse() {
-            return Ok(unit);
-        };
-
-        Err(MischiefError::TailwindParsingError(format!("Unable to parse a value from: {}", token.elements.join("-"))))
     }
 }
 
@@ -187,18 +90,22 @@ impl Default for Style {
             borders: Borders::empty(),
             border_type: BorderType::Plain,
             border_size: StyleRect::ZERO,
-            has_title : false
+            bg_color: Color::Black,
+            fg_color: Color::White,
+            border_bg_color : Color::Black,
+            border_fg_color : Color::White
         }
     }
 }
 
 impl Into<taffy::Style> for Style {
     fn into(mut self) -> taffy::Style {
-        if self.has_title { self.border_size.top.set_px_if_over(1);}
-        if self.borders.contains(Borders::TOP) { self.border_size.top.set_px_if_over(1);}
-        if self.borders.contains(Borders::BOTTOM) { self.border_size.bottom.set_px_if_over(1);}
-        if self.borders.contains(Borders::LEFT) { self.border_size.left.set_px_if_over(1);}
-        if self.borders.contains(Borders::RIGHT) { self.border_size.right.set_px_if_over(1);}
+        // if self.title.is_some() { self.border_size.top.set_px_if_over(1) }
+        // if self.bottom_title.is_some() { self.border_size.bottom.set_px_if_over(1) }
+        if self.borders.contains(Borders::TOP) { self.border_size.top.set_px_if_over(1) }
+        if self.borders.contains(Borders::BOTTOM) { self.border_size.bottom.set_px_if_over(1) }
+        if self.borders.contains(Borders::LEFT) { self.border_size.left.set_px_if_over(1) }
+        if self.borders.contains(Borders::RIGHT) { self.border_size.right.set_px_if_over(1) }
         taffy::Style {
             border : self.border_size.into(),
             size : self.size.into(),
@@ -215,42 +122,6 @@ impl Into<taffy::Style> for Style {
             ..Default::default()
         }
     }
-}
-
-
-
-impl Style {
-    // pub fn fg(self, color : Color) -> Self { 
-    //     Self(self.0.fg(color))
-    // }
-    
-    // pub fn bg(self, color : Color) -> Self { 
-    //     Self(self.0.bg(color))
-    // }
-    
-    // pub fn underline_color(self, color : Color) -> Self { 
-    //     Self(self.0.underline_color(color))
-    // }
-    
-    // pub fn patch(self, style : Style) -> Self { 
-    //     Self(self.0.patch(style.0))
-    // }
-    
-    // pub fn add_modifier(self, modifier : Modifier) -> Self { 
-    //     Self(self.0.add_modifier(modifier))
-    // }
-    
-    // pub fn remove_modifier(self, modifier : Modifier) -> Self { 
-    //     Self(self.0.remove_modifier(modifier))
-    // }
-    
-    // pub fn set_style(&mut self, style : ratatui::style::Style) {
-    //     self.0 = style;
-    // }
-    
-    // pub fn set_fg(&mut self, color : Color) {
-    //     self.0 = self.0.fg(color)
-    // }
 }
 
 //==============================================================================================
@@ -427,142 +298,153 @@ impl Into<taffy::Size<taffy::Dimension>> for StyleSize {
 }
 
 //==============================================================================================
-//        BorderStyle
+//        Helper Functions
 //==============================================================================================
 
-#[derive(Debug, Default)]
-pub struct BorderStyle {
-    pub title : Option<String>,
-    pub borders : Borders,
-    pub coloring : ratatui::style::Style,
-    pub border_type : BorderType
+fn set_flex_styles(styles : &mut Style, token : &AstStyle) {
+    if !token.elements.starts_with(&["flex"]) { return }
+    
+    if token.elements.eq(&["flex"]) {
+        styles.display = taffy::Display::Flex
+    }
+    
+    if token.elements.eq(&["flex", "col"]) {
+        styles.flex_direction = taffy::FlexDirection::Column
+    }
+
+    if token.elements.eq(&["flex", "col", "reverse"]) {
+        styles.flex_direction = taffy::FlexDirection::ColumnReverse
+    }
+
+    if token.elements.eq(&["flex", "row"]) {
+        styles.flex_direction = taffy::FlexDirection::Row
+    }
+
+    if token.elements.eq(&["flex", "row", "reverse"]) {
+        styles.flex_direction = taffy::FlexDirection::RowReverse
+    }
 }
 
-//==============================================================================================
-//        Get Styles from attributes
-//==============================================================================================
+fn set_dimention<const DIM : char>(value : &mut Unit, min : &mut Unit, max : &mut Unit, token : &AstStyle) {
+    let mut buffer = [0; 4]; // A char can be up to 4 bytes
+    let s: &str = DIM.encode_utf8(&mut buffer);
+    if !token.elements.starts_with(&[s]) { return }
 
-// #[derive(Debug, Default)]
-// pub struct StyleSummary {
-//     pub layout : Layout,
-//     pub padding : Padding,
-//     pub style : Style,
-//     pub rect : crate::layout::Rect,
-//     pub border_style : BorderStyle
-// }
+    if let Some(next) = token.elements.get(1) {
+        let value = match *next {
+            "max" => max,
+            "min" => min,
+            _ => value
+        };
 
-// pub fn get_style_components_from_attributes(attributes : &Vec<OwnedAttribute>) -> Option<StyleSummary> {
-//     let style_attr = attributes.iter().find(|attr| &attr.name.local_name == "style")?;
-    
-//     let tokens = tailwind_ast::parse_tailwind(&style_attr.value)
-//         .inspect_err(|e| eprintln!("There was an error while parsing tailwind: {e:?}"))
-//         .ok()?;
-    
-//     let mut style_summary = StyleSummary::default();
-    
-//     for token in tokens.iter() {
-//         get_border_styles(token, &mut style_summary.border_style);
-//         get_padding_styles(token, &mut style_summary.padding);
-//         get_react_styles(token, &mut style_summary.rect);
-//     }
-    
-//     Some(style_summary)
-// }
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        *value = unit;
+    }
+}
 
-// fn get_border_styles(token : &AstStyle, border_style : &mut BorderStyle) {
-//     if !token.elements.starts_with(&["border"]) { return }
-    
-//     if let Some(value) = token.elements.get(1) && *value == "t" {border_style.borders |= Borders::TOP}
-//     if let Some(value) = token.elements.get(1) && *value == "b" {border_style.borders |= Borders::BOTTOM}
-//     if let Some(value) = token.elements.get(1) && *value == "l" {border_style.borders |= Borders::LEFT}
-//     if let Some(value) = token.elements.get(1) && *value == "r" {border_style.borders |= Borders::RIGHT}
-//     if let Some(value) = token.elements.get(1) && *value == "y" {border_style.borders |= Borders::TOP | Borders::BOTTOM }
-//     if let Some(value) = token.elements.get(1) && *value == "x" {border_style.borders |= Borders::RIGHT | Borders::LEFT }
-    
-//     if let None = token.elements.get(1) { border_style.borders = Borders::all() }
-    
-//     if let Some(value) = token.elements.get(1) && *value == "plain" {border_style.border_type = BorderType::Plain}
-//     if let Some(value) = token.elements.get(1) && *value == "double" {border_style.border_type = BorderType::Double}
-//     if let Some(value) = token.elements.get(1) && *value == "qi" {border_style.border_type = BorderType::QuadrantInside}
-//     if let Some(value) = token.elements.get(1) && *value == "qo" {border_style.border_type = BorderType::QuadrantOutside}
-//     if let Some(value) = token.elements.get(1) && *value == "rounded" {border_style.border_type = BorderType::Rounded}
-//     if let Some(value) = token.elements.get(1) && *value == "thick" {border_style.border_type = BorderType::Thick}
-// }
+fn set_borders(
+    borders : &mut Borders, 
+    border_type : &mut BorderType, 
+    border_bg_color : &mut Color, 
+    border_fg_color : &mut Color, 
+    token : &AstStyle
+) {
+    if token.elements.eq(&["border"]) {
+        *borders = Borders::all();
+    }
 
-// fn get_padding_styles(token : &AstStyle, padding : &mut Padding) {
-//     if token.elements.starts_with(&["p"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.bottom = value.into();
-//             padding.top = value.into();
-//             padding.right = value.into();
-//             padding.left = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["pt"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.top = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["pb"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.bottom = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["py"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.bottom = value.into();
-//             padding.top = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["pl"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.left = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["pr"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.right = value.into();
-//         }
-//     }
-    
-//     if token.elements.starts_with(&["px"]) {
-//         if let Some(value) = token.elements.get(1) {
-//             let Ok(value) = value.parse::<u16>() else { return };
-//             padding.left = value.into();
-//             padding.right = value.into();
-//         }
-//     }
-// }
+    if token.elements.starts_with(&["border"]) {
+        let Some(extra) = token.elements.get(1) else { return };
+        match *extra {
+            "t" => *borders |= Borders::TOP,
+            "b" => *borders |= Borders::BOTTOM,
+            "l" => *borders |= Borders::LEFT,
+            "r" => *borders |= Borders::RIGHT,
+            "x" => *borders |= Borders::LEFT | Borders::RIGHT,
+            "y" => *borders |= Borders::TOP | Borders::BOTTOM,
+            "plain" => *border_type = BorderType::Plain,
+            "double" => *border_type = BorderType::Double,
+            "rounded" => *border_type = BorderType::Rounded,
+            "thick" => *border_type = BorderType::Thick,
+            "bg" => if let Ok(color) = parse_end_color(token) { *border_bg_color = color}
+            "fg" => if let Ok(color) = parse_end_color(token) { *border_fg_color = color}
+            _ => {}
+        }
+    }
+}
 
-// fn get_react_styles(token : &AstStyle, rect : &mut crate::layout::Rect) {
-//     if token.elements.starts_with(&["x"]) && let Some(value) = token.elements.get(1) {
-//         let Ok(value) = value.parse::<u16>() else { return };
-//         rect.x = Value::Px(value)
-//     }
+fn set_style_rect(prefix : &str, value : &mut StyleRect, token : &AstStyle) {
+    if token.elements.starts_with(&[&format!("{prefix}l")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.left = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}r")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.right = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}t")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.top = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}b")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.bottom = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}x")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.left = unit;
+        value.right = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}y")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.top = unit;
+        value.bottom = unit;
+    }
+
+    if token.elements.starts_with(&[&format!("{prefix}")]) {
+        let Ok(unit) = parse_end_number_or_arbitrary(token) else { return };
+        value.top = unit;
+        value.bottom = unit;
+        value.left = unit;
+        value.right = unit;
+    }
+}
+
+fn parse_end_number_or_arbitrary(token : &AstStyle) -> MischiefResult<Unit> {
+    if let Some(last) = token.elements.last() && let Ok(unit) = last.parse() {
+        return Ok(unit)
+    }
     
-//     if token.elements.starts_with(&["y"]) && let Some(value) = token.elements.get(1) {
-//         let Ok(value) = value.parse::<u16>() else { return };
-//         rect.y = Value::Px(value)
-//     }
+    if let Some(arbitrary) = token.arbitrary && let Ok(unit) = arbitrary.parse() {
+        return Ok(unit);
+    };
+
+    Err(MischiefError::TailwindParsingError(format!("Unable to parse a value from: {}", token.elements.join("-"))))
+}
+
+fn parse_end_color(token : &AstStyle) -> MischiefResult<Color> {
     
-//     if token.elements.starts_with(&["w"]) && let Some(value) = token.elements.get(1) {
-//         let Ok(value) = value.parse::<u16>() else { return };
-//         rect.width = Value::Px(value)
-//     }
-    
-//     if token.elements.starts_with(&["h"]) && let Some(value) = token.elements.get(1) {
-//         let Ok(value) = value.parse::<u16>() else { return };
-//         rect.height = Value::Px(value)
-//     }
-// }
+    if token.elements.ends_with(&["black"]) {return Ok(Color::Black) }
+    if token.elements.ends_with(&["red"]) {return Ok(Color::Red) }
+    if token.elements.ends_with(&["green"]) {return Ok(Color::Green) }
+    if token.elements.ends_with(&["yellow"]) {return Ok(Color::Yellow) }
+    if token.elements.ends_with(&["blue"]) {return Ok(Color::Blue) }
+    if token.elements.ends_with(&["magenta"]) {return Ok(Color::Magenta) }
+    if token.elements.ends_with(&["cyan"]) {return Ok(Color::Cyan) }
+    if token.elements.ends_with(&["white"]) {return Ok(Color::White) }
+    if token.elements.ends_with(&["gray"]) {return Ok(Color::Gray) }
+    if token.elements.ends_with(&["light", "red"]) {return Ok(Color::LightRed) }
+    if token.elements.ends_with(&["light", "green"]) {return Ok(Color::LightGreen) }
+    if token.elements.ends_with(&["light", "yellow"]) {return Ok(Color::LightYellow) }
+    if token.elements.ends_with(&["light", "blue"]) {return Ok(Color::LightBlue) }
+    if token.elements.ends_with(&["light", "magenta"]) {return Ok(Color::LightMagenta) }
+    if token.elements.ends_with(&["light", "cyan"]) {return Ok(Color::LightCyan) }
+    if token.elements.ends_with(&["dark", "gray"]) {return Ok(Color::DarkGray) }
+
+    Err(MischiefError::TailwindParsingError(format!("Unable to parse a color from: {}", token.elements.join("-"))))
+}

@@ -3,7 +3,7 @@ use std::{collections::{HashSet, VecDeque}, io::BufReader};
 use bevy::{asset::{AssetLoader, AsyncReadExt}, prelude::*};
 use xml::{EventReader, ParserConfig, reader::XmlEvent};
 
-use crate::{node::{Node, block::Block}};
+use crate::{layout::Rect, node::{Node, block::Block, paragraph::Paragraph}, style::Style};
 
 //==============================================================================================
 //        TerminalComponentPlugin
@@ -62,6 +62,14 @@ pub fn asset_loaded_or_changed(
                     ignore_depth += 1
                 },
                 XmlEvent::EndElement { .. } => { if ignore_depth == 0 { parent_stack.pop_front(); } else { ignore_depth -= 1 } },
+                XmlEvent::Characters(characters) => {
+                    let mut entity_commands = commands.entity(parent_stack.front().unwrap().clone());
+                    entity_commands.with_child((
+                        Paragraph(characters.clone()),
+                        Style::minimum_space(),
+                        Rect::default()
+                    ));
+                }
                 _ => {}
             }
         }

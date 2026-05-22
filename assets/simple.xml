@@ -1,7 +1,9 @@
-<Block title="test" style="flex flex-col" id="main">
+<Block style="flex flex-col" id="main">
     This is some text
-    <Block title=" test 1 " style="border h-10" />
-    <Block title=" test 2 " style="border h-20" />
-    <Block title=" test 3 " style="border h-20" />
-    <Slot id="buttons"/>
+    <Block title=" Box 1 " style="border border-fg-red h-15" />
+    <Block title=" Box 2 " style="border border-fg-blue h-15" />
+    <Block title=" Box 3 " style="border border-fg-green h-15" />
+    <Block title=" Box 4 " style="border border-fg-magenta h-15">
+        <Slot id="buttons"/>
+    </Block>
 </Block>
