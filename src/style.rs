@@ -1,9 +1,9 @@
 use std::{str::FromStr};
 
 use bevy::prelude::*;
-use ratatui::{style::Color, symbols::border, widgets::{Block, BorderType, Borders}};
+use ratatui::{style::Color, widgets::{Block, BorderType, Borders}};
 use regex::Regex;
-use taffy::{Dimension, LengthPercentage, LengthPercentageAuto, style_helpers::{FromLength, FromPercent, TaffyAuto, TaffyZero}};
+use taffy::{Dimension, LengthPercentage, LengthPercentageAuto, Size, style_helpers::{FromLength, FromPercent, TaffyAuto, TaffyZero}};
 use tailwind_ast::AstStyle;
 use xml::attribute::OwnedAttribute;
 
@@ -216,6 +216,54 @@ impl Into<taffy::Dimension> for Unit {
     }
 }
 
+impl From<u16> for Unit {
+    fn from(value: u16) -> Self {
+        Unit::Px(value)
+    }
+}
+
+impl From<u32> for Unit {
+    fn from(value: u32) -> Self {
+        Unit::Px(value as u16)
+    }
+}
+
+impl From<u64> for Unit {
+    fn from(value: u64) -> Self {
+        Unit::Px(value as u16)
+    }
+}
+
+impl From<usize> for Unit {
+    fn from(value: usize) -> Self {
+        Unit::Px(value as u16)
+    }
+}
+
+impl From<i32> for Unit {
+    fn from(value: i32) -> Self {
+        Unit::Px(value as u16)
+    }
+}
+
+impl From<i64> for Unit {
+    fn from(value: i64) -> Self {
+        Unit::Px(value as u16)
+    }
+}
+
+impl From<f32> for Unit {
+    fn from(value: f32) -> Self {
+        Unit::Percent(value)
+    }
+}
+
+impl From<f64> for Unit {
+    fn from(value: f64) -> Self {
+        Unit::Percent(value as f32)
+    }
+}
+
 //==============================================================================================
 //        StyleRect
 //==============================================================================================
@@ -254,8 +302,20 @@ impl Into<taffy::Rect<LengthPercentage>> for StyleRect {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StyleSize {
-    width : Unit,
-    height : Unit
+    pub width : Unit,
+    pub height : Unit
+}
+
+impl StyleSize {
+
+    pub fn new(width : impl Into<Unit>, height : impl Into<Unit>) -> Self {
+        StyleSize { width: width.into(), height: height.into() }
+    }
+
+    pub fn square(size : impl Into<Unit>) -> Self {
+        let size = size.into();
+        StyleSize { width: size, height: size }
+    }
 }
 
 impl StyleSize {

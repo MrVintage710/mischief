@@ -8,7 +8,7 @@ use bevy::{ecs::{relationship::RelationshipSourceCollection, system::SystemParam
 use ratatui::buffer::Buffer;
 use xml::{attribute::OwnedAttribute, name::OwnedName, namespace::Namespace};
 
-use crate::{Debug, Terminal, layout::calc_layout, node::{block::Block, paragraph::Paragraph, query::{NodeEntity, NodeFindRootsAbility}}};
+use crate::{Debug, Terminal, layout::calc_layout, node::{block::Block, paragraph::Paragraph, query::{NodeEntity, NodeEntityMut, NodeFindRootsAbility}}, style::{Style, StyleSize}};
 
 //==============================================================================================
 //        NodePlugin
@@ -89,18 +89,19 @@ pub trait Node : Component {
         &'a self, 
         area: &ratatui::layout::Rect, 
         buf: &mut Buffer, 
-        style : ratatui::style::Style,
-        block : ratatui::widgets::block::Block<'a>
+        style : &Style,
     );
     
     fn parse(parent : &mut EntityCommands, name : &OwnedName, attributes: &Vec<OwnedAttribute>, namespace : &Namespace) -> Option<Entity>;
+
+    fn calc_required_space(&self, area : &crate::layout::Rect, _style : &mut Style) { }
 }
 
 #[derive(Component)]
 pub struct NullComponent;
 
 impl Node for NullComponent {
-    fn render<'a>(&'a self, _area: &ratatui::layout::Rect, _buf: &mut Buffer, _style : ratatui::style::Style, _block : ratatui::widgets::block::Block<'a>) {}
+    fn render<'a>(&'a self, _area: &ratatui::layout::Rect, _buf: &mut Buffer, _style : &Style) {}
 
     fn parse(_parent : &mut EntityCommands, _name : &OwnedName, _attributes: &Vec<OwnedAttribute>, _namespace : &Namespace) -> Option<Entity> { None }
 }
@@ -112,20 +113,18 @@ impl Node for NullComponent {
 #[derive(SystemParam)]
 pub struct NodeRenderer<'w, 's> {
     terminal : ResMut<'w, Terminal>,
-    block_components : Query<'w, 's, (&'static Block, NodeEntity)>,
-    paragraph_nodes : Query<'w, 's, (&'static Paragraph, NodeEntity)>
+    block_components : Query<'w, 's, (&'static Block, &'static crate::layout::Rect, &'static Style)>,
+    paragraph_nodes : Query<'w, 's, (&'static Paragraph, &'static crate::layout::Rect, &'static Style)>
 }
 
 impl <'w, 's> NodeRenderer<'w, 's> {
     pub fn render(&mut self, node : Entity) {
-        if let Ok((block, block_node)) = self.block_components.get(node) {
-            let inner_block = block_node.style.create_block();
-            block.render(&block_node.rect.0, self.terminal.current_buffer_mut(), block_node.style.style, inner_block);
+        if let Ok((node, rect, style)) = self.block_components.get(node) {
+            node.render(&rect.0, self.terminal.current_buffer_mut(), style);
         }
 
-        if let Ok((node, node_items)) = self.paragraph_nodes.get(node) {
-            let inner_block = node_items.style.create_block();
-            node.render(&node_items.rect.0, self.terminal.current_buffer_mut(), node_items.style.style, inner_block);
+        if let Ok((node, rect, style)) = self.paragraph_nodes.get(node) {
+            node.render(&rect.0, self.terminal.current_buffer_mut(), style);
         }
     }
 }

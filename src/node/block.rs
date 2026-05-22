@@ -23,7 +23,8 @@ impl Block {
 }
 
 impl Node for Block {
-    fn render<'a>(&'a self, area: & ratatui::layout::Rect, buf: &mut Buffer, _style : ratatui::style::Style, mut block : block::Block<'a>) {
+    fn render<'a>(&'a self, area: & ratatui::layout::Rect, buf: &mut Buffer, style : &Style) {
+        let mut block = style.create_block();
         if let Some(title) = &self.title { block = block.title(title.as_str()) }
         if let Some(title) = &self.title_bottom { block = block.title_bottom(title.as_str()) }
         block.render(*area, buf);

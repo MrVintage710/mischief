@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}};
+use std::{collections::{HashMap, HashSet}, ops::{Deref, DerefMut}};
 
 use bevy::prelude::*;
 use taffy::{AvailableSpace, NodeId, TaffyTree};
@@ -110,6 +110,20 @@ pub fn resize(
 #[derive(Component, Default, Clone, Copy, Debug)]
 #[require(LayoutState)]
 pub struct Rect(pub ratatui::layout::Rect);
+
+impl DerefMut for Rect {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for Rect {
+    type Target = ratatui::layout::Rect;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 //==============================================================================================
 //        NodeState
